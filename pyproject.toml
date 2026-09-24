@@ -1,0 +1,23 @@
+[project]
+name = "airbnb-snowflake-dbt-pipeline"
+version = "0.1.0"
+description = "Airbnb data transformation and analytics pipeline using dbt and Snowflake"
+readme = "README.md"
+authors = [
+    { name = "Jimit Naik", email = "jnaik_chetan@yahoo.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "dbt-core>=1.12.5",
+    "dbt-snowflake>=1.12.1",
+    "boto3>=1.43.102",
+    "boto3-stubs[s3]>=1.43.102",
+    "pytest>=7.4.0",
+]   
+
+[project.scripts]
+airbnb-snowflake-dbt-pipeline = "airbnb_snowflake_dbt_pipeline:main"
+
+[build-system]
+requires = ["uv_build>=0.12.18,<0.13.0"]
+build-backend = "uv_build"
