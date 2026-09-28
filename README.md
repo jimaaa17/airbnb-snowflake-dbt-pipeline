@@ -6,45 +6,53 @@ An end-to-end data transformation and analytics pipeline for Airbnb data on Snow
 
 ## 📌 Project Overview
 
-This project ingests raw Airbnb data from a staging layer and processes it through a multi-tier data warehouse architecture in Snowflake:
-- **Raw / Staging**: External data ingestion into raw Snowflake tables (`listings`, `bookings`, `hosts`).
-- **Bronze Layer (Completed)**: Raw ingestion models with schema isolation and incremental loading capabilities.
-- **Silver Layer (Upcoming)**: Cleaned, validated, and normalized data models applying transformation macros.
-- **Gold Layer (Upcoming)**: Fact and dimension analytical models ready for BI reporting and metrics.
+This project implements an end-to-end ELT data pipeline for Airbnb datasets using **AWS S3**, **Snowflake**, and **dbt** with a **Medallion Architecture**:
+
+```text
+Source Data (CSV) ──> AWS S3 ──> Snowflake (Staging) ──> Bronze Layer ──> Silver Layer ──> Gold Layer
+                                          │                     │               │              │
+                                     Raw Tables            Raw Ingestion   Cleaned Data    Analytics
+```
+
+- **Source Data (CSV)**: Raw Airbnb CSV files (`listings.csv`, `bookings.csv`, `hosts.csv`).
+- **AWS S3**: Cloud object storage acting as the external landing and staging repository.
+- **Snowflake (Staging Layer)**: Raw relational tables in `AIRBNB.staging` loaded via Snowflake external stages / `COPY INTO`.
+- **Bronze Layer (`AIRBNB.bronze`)**: Incremental 1-to-1 raw ingestion models managed by dbt.
+- **Silver Layer (`AIRBNB.silver`)**: Cleaned, standardized, and enriched models applying business transformation macros.
+- **Gold Layer (`AIRBNB.gold`)**: High-performance analytical fact and dimension models optimized for BI and metrics.
 
 ---
 
-## 🏗️ Architecture & Progress (Up to Today)
+## 🏗️ Architecture & Data Flow
 
 ```mermaid
 flowchart LR
-    subgraph Staging ["Raw Staging (AIRBNB.staging)"]
-        S1[(listings)]
-        S2[(bookings)]
-        S3[(hosts)]
+    CSV["📄 Source Data<br/>(CSV Files)"]
+    S3[("☁️ AWS S3<br/>(Landing Zone)")]
+    
+    subgraph Snowflake ["Snowflake Cloud Data Platform (AIRBNB DB)"]
+        subgraph Staging ["Staging Layer (staging)"]
+            RAW[("Raw Tables<br/>• listings<br/>• bookings<br/>• hosts")]
+        end
+
+        subgraph Bronze ["Bronze Layer (bronze)"]
+            BRZ["Raw Ingestion<br/>• bronze_listings<br/>• bronze_bookings<br/>• bronze_hosts"]
+        end
+
+        subgraph Silver ["Silver Layer (silver)"]
+            SLV["Cleaned Data<br/>• Type Casting<br/>• Macro Transformations<br/>• Null Handling"]
+        end
+
+        subgraph Gold ["Gold Layer (gold)"]
+            GLD["Analytics Layer<br/>• Fact Bookings<br/>• Dim Listings & Hosts<br/>• Business Metrics"]
+        end
     end
 
-    subgraph Bronze ["Bronze Layer (AIRBNB.bronze)"]
-        B1[bronze_listings]
-        B2[bronze_bookings]
-        B3[bronze_hosts]
-    end
-
-    subgraph Silver ["Silver Layer (Upcoming)"]
-        SL1[Cleaned & Normalized]
-    end
-
-    subgraph Gold ["Gold Layer (Upcoming)"]
-        GL1[Analytics & Reporting]
-    end
-
-    S1 --> B1
-    S2 --> B2
-    S3 --> B3
-    B1 --> SL1
-    B2 --> SL1
-    B3 --> SL1
-    SL1 --> GL1
+    CSV --> S3
+    S3 -->|"COPY INTO / Stage"| RAW
+    RAW -->|"dbt source()"| BRZ
+    BRZ -->|"dbt ref() / Incremental"| SLV
+    SLV -->|"dbt ref() / Dimensional"| GLD
 ```
 
 ### ✅ Completed Work:
