@@ -8,3 +8,11 @@ wheels/
 
 # Virtual environments
 .venv
+
+# dbt & sensitive files
+logs/
+target/
+dbt_packages/
+profiles.yml
+.env
+.DS_Store
