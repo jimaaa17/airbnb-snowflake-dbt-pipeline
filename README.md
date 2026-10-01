@@ -68,8 +68,13 @@ flowchart LR
 5. **Bronze Layer Ingestion**:
    - Models created for `bronze_listings`, `bronze_bookings`, and `bronze_hosts`.
    - Materialization configured as `incremental` utilizing dbt's `is_incremental()` macro with timestamp watermarking on `CREATED_AT`.
-6. **IDE & Extension Tooling**:
-   - Configured `.vscode/settings.json` for dbt Power User extension compatibility with local `.venv`.
+6. **Silver Layer Cleansing & Enrichment**:
+   - Models created for `silver_bookings`, `silver_listings`, and `silver_hosts` (incremental).
+   - DRY Jinja macros developed: `multiply` (dynamic rounding), `tag` (tier bucketing), `trimmer` (string trimming).
+   - Schema tests configured (`unique`, `not_null` on all primary keys).
+7. **Gold Layer (One Big Table - OBT)**:
+   - Denormalized wide table `obt` joining bookings, listings, and hosts using dynamic Jinja loops.
+   - Fully tested with primary key uniqueness and non-null referential integrity tests.
 
 ---
 
@@ -87,15 +92,26 @@ Airbnb Snowflake DBT Pipeline/
     ├── profiles.yml                       # Connection profile (git-ignored for security)
     │
     ├── macros/
-    │   └── generate_schema_name.sql       # Custom macro for clean bronze/silver/gold schemas
+    │   ├── generate_schema_name.sql       # Custom macro for clean bronze/silver/gold schemas
+    │   ├── multiply.sql                   # Dynamic precision multiplication macro
+    │   ├── tag.sql                        # Conditional price tier bucketing macro
+    │   └── trim.sql                       # Reusable whitespace trimming macro
     │
     ├── models/
     │   ├── sources/
     │   │   └── sources.yml                # Raw staging source definitions
-    │   └── bronze/                        # Bronze layer models (incremental)
-    │       ├── bronze_listings.sql
-    │       ├── bronze_bookings.sql
-    │       ├── bronze_hosts.sql
+    │   ├── bronze/                        # Bronze layer models (incremental)
+    │   │   ├── bronze_listings.sql
+    │   │   ├── bronze_bookings.sql
+    │   │   ├── bronze_hosts.sql
+    │   │   └── properties.yml
+    │   ├── silver/                        # Silver layer models (incremental)
+    │   │   ├── silver_bookings.sql
+    │   │   ├── silver_listings.sql
+    │   │   ├── silver_hosts.sql
+    │   │   └── properties.yml
+    │   └── gold/                          # Gold layer models (analytical marts)
+    │       ├── obt.sql                    # One Big Table (OBT) denormalized mart
     │       └── properties.yml
     │
     ├── analyses/                          # Ad-hoc exploratory queries & Jinja experiments
@@ -143,19 +159,21 @@ cd airbnb_snowflake_dbt_pipeline
 dbt debug
 ```
 
-### 5. Compile and Run Bronze Models
+### 5. Compile and Run Models
 ```bash
 # Compile and check DAG
 dbt compile
 
-# Run all Bronze models
+# Run Bronze models
 dbt run --select bronze
 
-# Run all Silver models
+# Run Silver models and tests
 dbt run --select silver
-
-# Run Silver data quality tests
 dbt test --select silver
+
+# Run Gold OBT model and tests
+dbt run --select obt
+dbt test --select obt
 ```
 
 ---
@@ -164,4 +182,5 @@ dbt test --select silver
 - [x] Develop **Silver Layer**: Data cleansing, handling nulls, type-casting, and business transformations (`silver_bookings`, `silver_listings`, `silver_hosts`).
 - [x] Create reusable Jinja macros for transformations (`multiply`, `tag`, `trimmer`).
 - [x] Implement data quality tests (uniqueness, not-null on primary keys).
-- [ ] Build **Gold Layer**: Dimensional models (fact bookings, dim listings, dim hosts).
+- [x] Build **Gold Layer - OBT**: Denormalized One Big Table (`obt`) combining Silver layer models using dynamic Jinja loops.
+- [ ] Build **Gold Layer - Star Schema**: Dimensional fact and dimension models (`fact_bookings`, `dim_listings`, `dim_hosts`).
