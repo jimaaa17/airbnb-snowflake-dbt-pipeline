@@ -1,0 +1,19 @@
+version: 2
+
+models:
+  - name: obt
+    description: "One Big Table (OBT) denormalized analytical dataset joining silver bookings, listings, and hosts for reporting and ad-hoc BI."
+    columns:
+      - name: BOOKING_ID
+        description: "Unique booking identifier (Primary Key of OBT)."
+        tests:
+          - unique
+          - not_null
+      - name: LISTING_ID
+        description: "Foreign key to the listing."
+        tests:
+          - not_null
+      - name: HOST_ID
+        description: "Foreign key to the host."
+        tests:
+          - not_null
