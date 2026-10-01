@@ -1,0 +1,29 @@
+version: 2
+
+models:
+  - name: silver_bookings
+    description: "Cleansed and enriched bookings data with total amount calculated via multiply macro."
+    columns:
+      - name: BOOKING_ID
+        description: "Primary key for bookings."
+        tests:
+          - unique
+          - not_null
+
+  - name: silver_listings
+    description: "Standardized listings data with price tier categorization via tag macro."
+    columns:
+      - name: LISTING_ID
+        description: "Primary key for listings."
+        tests:
+          - unique
+          - not_null
+
+  - name: silver_hosts
+    description: "Standardized host profiles with formatted names and response rate band categorization."
+    columns:
+      - name: HOST_ID
+        description: "Primary key for hosts."
+        tests:
+          - unique
+          - not_null
