@@ -2,5 +2,52 @@ version: 2
 
 models:
   - name: bronze_bookings
-    config:
-      materialized: view
+    description: "Raw 1:1 incremental ingestion of bookings from staging."
+    columns:
+      - name: BOOKING_ID
+        description: "Primary key for bookings."
+        data_tests:
+          - unique
+          - not_null
+      - name: LISTING_ID
+        data_tests:
+          - not_null
+      - name: BOOKING_DATE
+        data_tests:
+          - not_null
+      - name: CREATED_AT
+        data_tests:
+          - not_null
+
+  - name: bronze_listings
+    description: "Raw 1:1 incremental ingestion of listings from staging."
+    columns:
+      - name: LISTING_ID
+        description: "Primary key for listings."
+        data_tests:
+          - unique
+          - not_null
+      - name: HOST_ID
+        data_tests:
+          - not_null
+      - name: PRICE_PER_NIGHT
+        data_tests:
+          - not_null
+      - name: CREATED_AT
+        data_tests:
+          - not_null
+
+  - name: bronze_hosts
+    description: "Raw 1:1 incremental ingestion of hosts from staging."
+    columns:
+      - name: HOST_ID
+        description: "Primary key for hosts."
+        data_tests:
+          - unique
+          - not_null
+      - name: HOST_NAME
+        data_tests:
+          - not_null
+      - name: CREATED_AT
+        data_tests:
+          - not_null
