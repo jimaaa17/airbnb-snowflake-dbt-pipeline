@@ -16,9 +16,5 @@ dependencies = [
     "sqlfmt>=0.0.3",
 ]   
 
-[project.scripts]
-airbnb-snowflake-dbt-pipeline = "airbnb_snowflake_dbt_pipeline:main"
-
-[build-system]
-requires = ["uv_build>=0.12.18,<0.13.0"]
-build-backend = "uv_build"
+[tool.uv]
+package = false
