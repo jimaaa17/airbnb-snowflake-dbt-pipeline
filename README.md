@@ -150,12 +150,18 @@ dbt compile
 
 # Run all Bronze models
 dbt run --select bronze
+
+# Run all Silver models
+dbt run --select silver
+
+# Run Silver data quality tests
+dbt test --select silver
 ```
 
 ---
 
 ## 🗺️ Next Steps
-- [ ] Develop **Silver Layer**: Data cleansing, handling nulls, type-casting, and business transformations.
-- [ ] Create reusable Jinja macros for currency formatting, date parsing, and standardization.
-- [ ] Implement data quality tests (uniqueness, not-null, referential integrity).
+- [x] Develop **Silver Layer**: Data cleansing, handling nulls, type-casting, and business transformations (`silver_bookings`, `silver_listings`, `silver_hosts`).
+- [x] Create reusable Jinja macros for transformations (`multiply`, `tag`, `trimmer`).
+- [x] Implement data quality tests (uniqueness, not-null on primary keys).
 - [ ] Build **Gold Layer**: Dimensional models (fact bookings, dim listings, dim hosts).
