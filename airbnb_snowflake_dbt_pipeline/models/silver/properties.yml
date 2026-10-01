@@ -6,8 +6,33 @@ models:
     columns:
       - name: BOOKING_ID
         description: "Primary key for bookings."
-        tests:
+        data_tests:
           - unique
+          - not_null
+      - name: LISTING_ID
+        description: "Foreign key referencing silver_listings."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('silver_listings')
+                field: LISTING_ID
+      - name: BOOKING_DATE
+        data_tests:
+          - not_null
+      - name: TOTAL_AMOUNT
+        description: "Calculated as (nights_booked * booking_amount) + cleaning_fee + service_fee."
+        data_tests:
+          - not_null
+      - name: BOOKING_STATUS
+        description: "Booking lifecycle status."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['confirmed', 'cancelled']
+      - name: CREATED_AT
+        data_tests:
           - not_null
 
   - name: silver_listings
@@ -15,8 +40,56 @@ models:
     columns:
       - name: LISTING_ID
         description: "Primary key for listings."
-        tests:
+        data_tests:
           - unique
+          - not_null
+      - name: HOST_ID
+        description: "Foreign key referencing silver_hosts."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('silver_hosts')
+                field: HOST_ID
+      - name: PROPERTY_TYPE
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['Apartment', 'Condo', 'House']
+      - name: ROOM_TYPE
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['Entire home', 'Private room']
+      - name: CITY
+        data_tests:
+          - not_null
+      - name: COUNTRY
+        data_tests:
+          - not_null
+      - name: ACCOMMODATES
+        data_tests:
+          - not_null
+      - name: BEDROOMS
+        data_tests:
+          - not_null
+      - name: BATHROOMS
+        data_tests:
+          - not_null
+      - name: PRICE_PER_NIGHT
+        data_tests:
+          - not_null
+      - name: PRICE_PER_NIGHT_TAG
+        description: "Derived tier bucket from tag macro."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['LOW', 'MEDIUM', 'HIGH']
+      - name: CREATED_AT
+        data_tests:
           - not_null
 
   - name: silver_hosts
@@ -24,6 +97,25 @@ models:
     columns:
       - name: HOST_ID
         description: "Primary key for hosts."
-        tests:
+        data_tests:
           - unique
+          - not_null
+      - name: HOST_NAME
+        data_tests:
+          - not_null
+      - name: HOST_SINCE
+        data_tests:
+          - not_null
+      - name: RESPONSE_RATE
+        data_tests:
+          - not_null
+      - name: RESPONSE_RATE_BAND
+        description: "Derived band based on response rate thresholds."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['VERY GOOD', 'GOOD', 'AVERAGE', 'POOR']
+      - name: CREATED_AT
+        data_tests:
           - not_null

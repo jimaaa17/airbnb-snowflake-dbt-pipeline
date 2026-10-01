@@ -6,14 +6,38 @@ models:
     columns:
       - name: BOOKING_ID
         description: "Unique booking identifier (Primary Key of OBT)."
-        tests:
+        data_tests:
           - unique
           - not_null
       - name: LISTING_ID
         description: "Foreign key to the listing."
-        tests:
+        data_tests:
           - not_null
       - name: HOST_ID
         description: "Foreign key to the host."
-        tests:
+        data_tests:
           - not_null
+      - name: TOTAL_AMOUNT
+        data_tests:
+          - not_null
+      - name: BOOKING_STATUS
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['confirmed', 'cancelled']
+      - name: PRICE_PER_NIGHT
+        data_tests:
+          - not_null
+      - name: PRICE_PER_NIGHT_TAG
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['LOW', 'MEDIUM', 'HIGH']
+      - name: RESPONSE_RATE_BAND
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['VERY GOOD', 'GOOD', 'AVERAGE', 'POOR']
