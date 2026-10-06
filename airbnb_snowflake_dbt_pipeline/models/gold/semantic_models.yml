@@ -1,0 +1,167 @@
+version: 2
+
+semantic_models:
+  - name: airbnb_bookings_semantic
+    description: "Semantic model for Airbnb bookings denormalized across listings and hosts. Single source of truth for all booking transactions, revenues, and conversion metrics."
+    model: ref('obt')
+    defaults:
+      agg_time_dimension: booking_date
+
+    entities:
+      - name: booking
+        type: primary
+        expr: booking_id
+      - name: listing
+        type: foreign
+        expr: listing_id
+      - name: host
+        type: foreign
+        expr: host_id
+
+    dimensions:
+      - name: booking_date
+        type: time
+        type_params:
+          time_granularity: day
+        expr: booking_date
+
+      - name: booking_status
+        type: categorical
+        expr: booking_status
+
+      - name: property_type
+        type: categorical
+        expr: property_type
+
+      - name: room_type
+        type: categorical
+        expr: room_type
+
+      - name: city
+        type: categorical
+        expr: city
+
+      - name: country
+        type: categorical
+        expr: country
+
+      - name: price_tier
+        type: categorical
+        expr: price_per_night_tag
+
+      - name: is_superhost
+        type: categorical
+        expr: is_superhost
+
+      - name: response_rate_band
+        type: categorical
+        expr: response_rate_band
+
+    measures:
+      - name: total_booking_revenue
+        description: "Gross booking value in USD."
+        agg: sum
+        expr: total_amount
+
+      - name: total_cleaning_fees
+        description: "Total cleaning fees collected."
+        agg: sum
+        expr: cleaning_fee
+
+      - name: total_service_fees
+        description: "Total platform service fees collected."
+        agg: sum
+        expr: service_fee
+
+      - name: booking_count
+        description: "Total volume of booking attempts and transactions."
+        agg: count
+        expr: booking_id
+
+      - name: confirmed_booking_count
+        description: "Count of confirmed bookings."
+        agg: count
+        expr: "case when booking_status = 'confirmed' then booking_id else null end"
+
+      - name: cancelled_booking_count
+        description: "Count of cancelled bookings."
+        agg: count
+        expr: "case when booking_status = 'cancelled' then booking_id else null end"
+
+      - name: distinct_listings
+        description: "Count of distinct listings booked."
+        agg: count_distinct
+        expr: listing_id
+
+      - name: distinct_hosts
+        description: "Count of distinct active hosts."
+        agg: count_distinct
+        expr: host_id
+
+metrics:
+  - name: total_revenue
+    label: "Total Revenue ($)"
+    description: "Total gross booking revenue generated on the platform."
+    type: simple
+    type_params:
+      measure: total_booking_revenue
+
+  - name: total_bookings
+    label: "Total Bookings"
+    description: "Total volume of all bookings created."
+    type: simple
+    type_params:
+      measure: booking_count
+
+  - name: confirmed_bookings
+    label: "Confirmed Bookings"
+    description: "Total volume of confirmed bookings."
+    type: simple
+    type_params:
+      measure: confirmed_booking_count
+
+  - name: cancelled_bookings
+    label: "Cancelled Bookings"
+    description: "Total volume of cancelled bookings."
+    type: simple
+    type_params:
+      measure: cancelled_booking_count
+
+  - name: booking_conversion_rate
+    label: "Booking Conversion Rate"
+    description: "Governed ratio of confirmed bookings to total booking attempts. Eliminates cross-department metric drift."
+    type: ratio
+    type_params:
+      numerator: confirmed_bookings
+      denominator: total_bookings
+
+  - name: cancellation_rate
+    label: "Booking Cancellation Rate"
+    description: "Governed percentage of bookings cancelled by guests or hosts."
+    type: ratio
+    type_params:
+      numerator: cancelled_bookings
+      denominator: total_bookings
+
+  - name: average_booking_value
+    label: "Average Booking Value (ABV)"
+    description: "Average gross revenue generated per booking."
+    type: ratio
+    type_params:
+      numerator: total_revenue
+      denominator: total_bookings
+
+  - name: active_listings_count
+    label: "Active Listings Count"
+    description: "Total count of distinct active listings."
+    type: simple
+    type_params:
+      measure: distinct_listings
+
+  - name: revenue_per_active_listing
+    label: "Revenue Per Active Listing"
+    description: "Average revenue generated per active listing on the platform."
+    type: ratio
+    type_params:
+      numerator: total_revenue
+      denominator: active_listings_count

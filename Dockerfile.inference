@@ -1,0 +1,32 @@
+# Production Container for Airbnb Semantic & Predictive Inference API
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv for fast dependency resolution
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
+
+# Copy dependency files
+COPY pyproject.toml uv.lock .python-version ./
+
+# Install python dependencies via uv
+RUN uv sync --frozen --no-dev
+
+# Copy application and ML code
+COPY semantic_api/ ./semantic_api/
+COPY ml/ ./ml/
+
+# Expose FastAPI port
+EXPOSE 8000
+
+ENV PYTHONPATH="/app"
+ENV PYTHONUNBUFFERED=1
+
+# Run model evaluation gate on boot and start production uvicorn server
+CMD ["uv", "run", "uvicorn", "semantic_api.main:app", "--host", "0.0.0.0", "--port", "8000"]

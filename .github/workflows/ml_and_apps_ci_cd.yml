@@ -1,0 +1,215 @@
+name: ML Pipeline & Application CI/CD
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'ml/**'
+      - 'semantic_api/**'
+      - 'apps/**'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - 'Dockerfile.inference'
+      - '.github/workflows/ml_and_apps_ci_cd.yml'
+
+  push:
+    branches: [main]
+    paths:
+      - 'ml/**'
+      - 'semantic_api/**'
+      - 'apps/**'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - 'Dockerfile.inference'
+      - '.github/workflows/ml_and_apps_ci_cd.yml'
+
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'ML Action to execute'
+        required: true
+        default: 'full_pipeline'
+        type: choice
+        options:
+          - full_pipeline
+          - test_and_evaluate_only
+          - retrain_models
+          - batch_scoring
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # =========================================================================
+  # JOB 1: ML & APPLICATION CI GATES (PRs & Pushes)
+  # =========================================================================
+  ml-ci-pipeline:
+    name: ML Quality & Application CI Gates
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: ".python-version"
+
+      - name: Install dependencies via uv
+        run: |
+          uv sync --frozen
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> $GITHUB_PATH
+
+      - name: Syntax & Compilation Check
+        run: |
+          uv run python -m py_compile $(find ml semantic_api apps -name "*.py")
+
+      - name: Run ML Unit & Regression Tests (pytest)
+        run: |
+          uv run python -m pytest ml/tests/ -v
+
+      - name: Enforce MLOps Model Performance SLA Gate
+        run: |
+          uv run python ml/evaluation/eval_gate.py
+
+      - name: Smoke Test FastAPI & Scoring Endpoints
+        run: |
+          # Start FastAPI service in background
+          uv run uvicorn semantic_api.main:app --host 0.0.0.0 --port 8000 &
+          PID=$!
+          sleep 4
+
+          # Test health & catalog discovery
+          curl --fail -s http://localhost:8000/
+          curl --fail -s http://localhost:8000/api/v1/catalog
+
+          # Test real-time price estimation
+          curl --fail -s -X POST http://localhost:8000/api/v1/predict/price \
+            -H "Content-Type: application/json" \
+            -d '{
+              "accommodates": 4,
+              "bedrooms": 2,
+              "bathrooms": 1.5,
+              "cleaning_fee": 60.0,
+              "property_type": "Apartment",
+              "room_type": "Entire home",
+              "city": "Paris",
+              "is_superhost": "TRUE",
+              "response_rate": 95.0,
+              "response_rate_band": "VERY GOOD"
+            }'
+
+          # Test real-time cancellation prediction
+          curl --fail -s -X POST http://localhost:8000/api/v1/predict/cancellation \
+            -H "Content-Type: application/json" \
+            -d '{
+              "booking_date": "2024-06-15",
+              "booking_created_at": "2024-05-15",
+              "total_amount": 550.0,
+              "cleaning_fee": 70.0,
+              "service_fee": 50.0,
+              "accommodates": 4,
+              "bedrooms": 2,
+              "bathrooms": 1.5,
+              "price_per_night": 180.0,
+              "price_per_night_tag": "MEDIUM",
+              "property_type": "Apartment",
+              "room_type": "Entire home",
+              "city": "Paris",
+              "is_superhost": "TRUE",
+              "response_rate": 95.0,
+              "response_rate_band": "VERY GOOD"
+            }'
+
+          # Terminate background server
+          kill $PID || true
+
+      - name: Validate Streamlit Application Integrity
+        run: |
+          uv run python -c "import py_compile; py_compile.compile('apps/semantic_bi_app.py', doraise=True)"
+
+  # =========================================================================
+  # JOB 2: PRODUCTION ML RETRAINING & BATCH SCORING (Push to main / Dispatch)
+  # =========================================================================
+  ml-production-deployment:
+    name: Production Retraining & Scheduled Batch Scoring
+    needs: [ml-ci-pipeline]
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.action == 'full_pipeline' || github.event.inputs.action == 'retrain_models' || github.event.inputs.action == 'batch_scoring'))
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: ".python-version"
+
+      - name: Install dependencies via uv
+        run: |
+          uv sync --frozen
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> $GITHUB_PATH
+
+      - name: Retrain Model Pipelines (Zipline Feature Store)
+        if: github.event_name == 'push' || github.event.inputs.action == 'full_pipeline' || github.event.inputs.action == 'retrain_models'
+        run: |
+          uv run python ml/train_all.py
+
+      - name: Verify Post-Retraining Quality SLA
+        if: github.event_name == 'push' || github.event.inputs.action == 'full_pipeline' || github.event.inputs.action == 'retrain_models'
+        run: |
+          uv run python ml/evaluation/eval_gate.py
+
+      - name: Execute Scheduled Batch Inference Pipeline
+        if: github.event_name == 'push' || github.event.inputs.action == 'full_pipeline' || github.event.inputs.action == 'batch_scoring'
+        run: |
+          uv run python ml/run_batch_scoring.py --output ml/artifacts/scored_bookings_batch.parquet
+
+      - name: Upload Scored Batch Data & Model Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ml-production-artifacts
+          path: |
+            ml/artifacts/*.joblib
+            ml/artifacts/*.parquet
+            ml/experiments/*.json
+          retention-days: 30
+
+  # =========================================================================
+  # JOB 3: INFERENCE CONTAINER BUILD VERIFICATION (Push to main)
+  # =========================================================================
+  container-build-verification:
+    name: Build & Verify Production Inference Docker Container
+    needs: [ml-ci-pipeline]
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'full_pipeline')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Inference Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.inference
+          push: false
+          tags: airbnb-ml-inference-api:ci

@@ -1,0 +1,34 @@
+model_name: "cancellation_classifier"
+version: "1.0.0"
+target_column: "IS_CANCELLED"
+decision_threshold: 0.35
+
+features:
+  numeric:
+    - "lead_time_days"
+    - "TOTAL_AMOUNT"
+    - "CLEANING_FEE"
+    - "SERVICE_FEE"
+    - "cleaning_fee_ratio"
+    - "service_fee_ratio"
+    - "ACCOMMODATES"
+    - "BEDROOMS"
+    - "BATHROOMS"
+    - "price_per_accommodate"
+    - "host_response_rate"
+    - "trailing_30d_listing_bookings"
+    - "trailing_30d_listing_cancellations"
+    - "trailing_30d_cancellation_rate"
+  categorical:
+    - "PROPERTY_TYPE"
+    - "ROOM_TYPE"
+    - "CITY"
+    - "PRICE_PER_NIGHT_TAG"
+    - "is_superhost_binary"
+
+hyperparameters:
+  n_estimators: 120
+  max_depth: 6
+  learning_rate: 0.08
+  subsample: 0.85
+  random_state: 42

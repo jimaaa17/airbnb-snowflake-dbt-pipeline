@@ -16,3 +16,12 @@ dbt_packages/
 profiles.yml
 .env
 .DS_Store
+
+# Job aids & internal doc generators
+*.docx
+pipeline_dag.png
+build_job_aid_docx.py
+render_dag_image.py
+
+# Model artifacts
+*.joblib

@@ -1,0 +1,59 @@
+{
+  "experiment": "airbnb_predictive_models",
+  "run_name": "cancellation_classifier_v1",
+  "timestamp": "2026-10-06 14:00:42",
+  "parameters": {
+    "model_name": "cancellation_classifier",
+    "version": "1.0.0",
+    "target_column": "IS_CANCELLED",
+    "decision_threshold": 0.35,
+    "features": {
+      "numeric": [
+        "lead_time_days",
+        "TOTAL_AMOUNT",
+        "CLEANING_FEE",
+        "SERVICE_FEE",
+        "cleaning_fee_ratio",
+        "service_fee_ratio",
+        "ACCOMMODATES",
+        "BEDROOMS",
+        "BATHROOMS",
+        "price_per_accommodate",
+        "host_response_rate",
+        "trailing_30d_listing_bookings",
+        "trailing_30d_listing_cancellations",
+        "trailing_30d_cancellation_rate"
+      ],
+      "categorical": [
+        "PROPERTY_TYPE",
+        "ROOM_TYPE",
+        "CITY",
+        "PRICE_PER_NIGHT_TAG",
+        "is_superhost_binary"
+      ]
+    },
+    "hyperparameters": {
+      "n_estimators": 120,
+      "max_depth": 6,
+      "learning_rate": 0.08,
+      "subsample": 0.85,
+      "random_state": 42
+    }
+  },
+  "metrics": {
+    "accuracy": 0.6533,
+    "precision": 0.3023,
+    "recall": 0.1494,
+    "f1_score": 0.2,
+    "roc_auc": 0.5141,
+    "pr_auc": 0.3176,
+    "brier_score": 0.2376,
+    "confusion_matrix": {
+      "true_negative": 183,
+      "false_positive": 30,
+      "false_negative": 74,
+      "true_positive": 13
+    }
+  },
+  "artifact_path": "ml/artifacts/cancellation_model.joblib"
+}

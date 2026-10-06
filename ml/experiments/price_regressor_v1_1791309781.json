@@ -1,0 +1,40 @@
+{
+  "experiment": "airbnb_predictive_models",
+  "run_name": "price_regressor_v1",
+  "timestamp": "2026-10-06 14:03:01",
+  "parameters": {
+    "model_name": "price_regressor",
+    "version": "1.0.0",
+    "target_column": "PRICE_PER_NIGHT",
+    "features": {
+      "numeric": [
+        "ACCOMMODATES",
+        "BEDROOMS",
+        "BATHROOMS",
+        "bedroom_to_accommodates_ratio",
+        "host_response_rate",
+        "CLEANING_FEE",
+        "is_superhost_binary"
+      ],
+      "categorical": [
+        "PROPERTY_TYPE",
+        "ROOM_TYPE",
+        "CITY",
+        "RESPONSE_RATE_BAND"
+      ]
+    },
+    "hyperparameters": {
+      "n_estimators": 150,
+      "max_depth": 5,
+      "learning_rate": 0.05,
+      "random_state": 42
+    }
+  },
+  "metrics": {
+    "rmse": 25.781,
+    "mae": 20.5356,
+    "r2_score": 0.9444,
+    "mape": 0.1043
+  },
+  "artifact_path": "ml/artifacts/price_regressor.joblib"
+}

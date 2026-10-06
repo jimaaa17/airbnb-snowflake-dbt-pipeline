@@ -1,0 +1,121 @@
+{
+  "info": {
+    "_postman_id": "airbnb-semantic-and-ml-layer-v1",
+    "name": "Airbnb Semantic Layer & Predictive ML API",
+    "description": "Governed Open-Source Semantic Query & Predictive Modeling API for Airbnb Analytics Engineering. Query metrics-as-code, discover data catalog metadata, and run real-time predictive inference (cancellation risk & dynamic pricing).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. System Health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8000/",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8000",
+          "path": [""]
+        }
+      }
+    },
+    {
+      "name": "2. Data Catalog - Discover All Governed Metrics",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8000/api/v1/catalog",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8000",
+          "path": ["api", "v1", "catalog"]
+        }
+      }
+    },
+    {
+      "name": "3. Data Catalog - Dataset Lineage & Quality Scores",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8000/api/v1/catalog/lineage",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8000",
+          "path": ["api", "v1", "catalog", "lineage"]
+        }
+      }
+    },
+    {
+      "name": "4. Semantic Query - Revenue & Booking Conversion by City",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"metrics\": [\"total_revenue\", \"booking_conversion_rate\"],\n  \"dimensions\": [\"city\"],\n  \"time_dimension\": \"booking_date\",\n  \"time_grain\": \"month\",\n  \"filters\": {\n    \"country\": \"USA\"\n  },\n  \"limit\": 50\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8000/api/v1/metrics/query",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8000",
+          "path": ["api", "v1", "metrics", "query"]
+        }
+      }
+    },
+    {
+      "name": "5. Predictive ML - Predict Booking Cancellation Risk",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"booking_date\": \"2024-06-15\",\n  \"booking_created_at\": \"2024-05-15\",\n  \"total_amount\": 650.0,\n  \"cleaning_fee\": 80.0,\n  \"service_fee\": 60.0,\n  \"accommodates\": 4,\n  \"bedrooms\": 2,\n  \"bathrooms\": 1.5,\n  \"price_per_night\": 210.0,\n  \"price_per_night_tag\": \"HIGH\",\n  \"property_type\": \"Apartment\",\n  \"room_type\": \"Entire home\",\n  \"city\": \"Paris\",\n  \"is_superhost\": \"FALSE\",\n  \"response_rate\": 75.0,\n  \"response_rate_band\": \"GOOD\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8000/api/v1/predict/cancellation",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8000",
+          "path": ["api", "v1", "predict", "cancellation"]
+        }
+      }
+    },
+    {
+      "name": "6. Predictive ML - Predict Listing Fair Market Price",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"accommodates\": 4,\n  \"bedrooms\": 2,\n  \"bathrooms\": 1.5,\n  \"cleaning_fee\": 70.0,\n  \"property_type\": \"Apartment\",\n  \"room_type\": \"Entire home\",\n  \"city\": \"New York\",\n  \"is_superhost\": \"TRUE\",\n  \"response_rate\": 98.0,\n  \"response_rate_band\": \"VERY GOOD\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8000/api/v1/predict/price",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8000",
+          "path": ["api", "v1", "predict", "price"]
+        }
+      }
+    }
+  ]
+}

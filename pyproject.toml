@@ -14,6 +14,14 @@ dependencies = [
     "boto3-stubs[s3]>=1.43.101",
     "pytest>=7.4.0",
     "sqlfmt>=0.0.3",
+    "fastapi>=0.142.2",
+    "uvicorn>=0.54.0",
+    "streamlit>=1.65.0",
+    "pandas>=3.0.6",
+    "scikit-learn>=1.9.1",
+    "xgboost>=3.4.1",
+    "joblib>=1.6.0",
+    "pyyaml>=6.0.3",
 ]   
 
 [tool.uv]
