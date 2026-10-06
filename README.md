@@ -83,6 +83,27 @@ flowchart LR
    - Implemented `tests/source_tests.sql` to catch null keys, non-positive nights, negative fees, and out-of-range response rates at the raw S3 ingestion layer before downstream processing.
    - Restored end-to-end lineage for `IS_SUPERHOST`, `CLEANING_FEE`, and `SERVICE_FEE` across Silver and Gold.
 
+10. **CI/CD Automation via GitHub Actions**:
+    - Automated pull request validation: executes `dbt debug`, `dbt compile`, and `dbt test` to block regressions before merge.
+    - Automated production deployment on `main`: executes `dbt snapshot` and `dbt build` across the entire pipeline.
+    - Secure secrets management: injected credentials (`SNOWFLAKE_ACCOUNT`, `SNOWFLAKE_USER`, `SNOWFLAKE_PASSWORD`, etc.) via GitHub Actions Secrets.
+
+---
+
+## 🔄 CI/CD Automation (GitHub Actions)
+
+The repository includes a production-grade CI/CD pipeline in [`.github/workflows/dbt_ci_cd.yml`](.github/workflows/dbt_ci_cd.yml):
+
+```text
+[ Developer PR ] ──> GitHub Actions CI ──> dbt debug ──> dbt compile ──> dbt test ──> [ Merge Allowed ]
+                                                                                             │
+[ Push to Main ] ──> GitHub Actions CD ──> dbt snapshot (SCD2) ──> dbt build (All Layers) ──┘
+```
+
+* **On Pull Request (`main`)**: Fast regression checks running `dbt test` against the staging/bronze/silver/gold layers.
+* **On Push (`main`)**: Production execution building snapshots and models in DAG order (`dbt build`).
+* **Manual Trigger (`workflow_dispatch`)**: Run ad-hoc commands (`build`, `test`, `snapshot`, `compile`) directly from GitHub Actions UI.
+
 ---
 
 ## 📂 Project Structure
@@ -205,5 +226,5 @@ dbt test
 - [x] Build **Gold Layer - OBT**: Denormalized One Big Table (`obt`) combining Silver layer models using dynamic Jinja loops.
 - [x] Build **Gold Layer - Star Schema**: Dimensional fact table (`facts`) and SCD Type 2 dimensions (`dim_bookings`, `dim_listings`, `dim_hosts`).
 - [x] Implement Shift-Left **Source Guardrails**: `source_tests.sql` for raw S3 ingestion validation.
-- [ ] Implement CI/CD automated pipeline via GitHub Actions for automated `dbt test` and `dbt build`.
+- [x] Implement CI/CD automated pipeline via GitHub Actions for automated `dbt test` and `dbt build`.
 - [ ] Connect BI Semantic Layer / Tableau / Metabase to `AIRBNB.gold`.
