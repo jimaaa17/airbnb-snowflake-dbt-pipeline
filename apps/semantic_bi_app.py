@@ -26,7 +26,7 @@ from apps.views import (
 # -----------------------------------------------------------------------------
 st.set_page_config(
     page_title="Airbnb Analytics Studio",
-    page_icon="🏠",
+    page_icon="apps/assets/airbnb_logo.png",
     layout="wide",
     initial_sidebar_state="expanded",
 )
