@@ -75,6 +75,13 @@ flowchart LR
 7. **Gold Layer (One Big Table - OBT)**:
    - Denormalized wide table `obt` joining bookings, listings, and hosts using dynamic Jinja loops.
    - Fully tested with primary key uniqueness and non-null referential integrity tests.
+8. **Gold Layer (Star Schema & SCD Type 2 Snapshots)**:
+   - **Type-2 Slowly Changing Dimensions (SCD2)**: Implemented `dim_bookings`, `dim_listings`, and `dim_hosts` using modern dbt YAML snapshots with active sentinel date (`to_date('9999-12-31')`).
+   - **Ephemeral Staging**: Modularized ephemeral pre-processing models in `models/gold/ephemeral/` (`bookings.sql`, `listings.sql`, `hosts.sql`) to decouple entity grains.
+   - **Dimensional Fact Table**: Implemented `facts.sql` using a DRY metadata-driven Jinja framework to join core booking metrics with dimension snapshots.
+9. **Source Data Quality & Shift-Left Guardrails**:
+   - Implemented `tests/source_tests.sql` to catch null keys, non-positive nights, negative fees, and out-of-range response rates at the raw S3 ingestion layer before downstream processing.
+   - Restored end-to-end lineage for `IS_SUPERHOST`, `CLEANING_FEE`, and `SERVICE_FEE` across Silver and Gold.
 
 ---
 
@@ -112,12 +119,25 @@ Airbnb Snowflake DBT Pipeline/
     │   │   └── properties.yml
     │   └── gold/                          # Gold layer models (analytical marts)
     │       ├── obt.sql                    # One Big Table (OBT) denormalized mart
+    │       ├── facts.sql                  # Central dimensional fact table
+    │       ├── ephemeral/                 # Ephemeral deduplicated dimension feeds
+    │       │   ├── bookings.sql
+    │       │   ├── listings.sql
+    │       │   └── hosts.sql
     │       └── properties.yml
     │
     ├── analyses/                          # Ad-hoc exploratory queries & Jinja experiments
-    ├── seeds/                             # CSV seed data
-    ├── snapshots/                         # Type-2 SCD snapshots
-    └── tests/                             # Custom singular and generic data tests
+    ├── snapshots/                         # SCD Type 2 YAML snapshot definitions
+    │   ├── dim_bookings.yml
+    │   ├── dim_listings.yml
+    │   └── dim_hosts.yml
+    └── tests/                             # Custom singular and gatekeeper data tests
+        ├── source_tests.sql               # S3/Staging ingestion guardrail
+        ├── assert_bronze_silver_row_counts_match.sql
+        ├── assert_obt_row_count_matches_bookings.sql
+        ├── assert_total_amount_is_positive.sql
+        ├── assert_response_rate_in_range.sql
+        └── assert_listing_price_and_capacity.sql
 ```
 
 ---
@@ -159,21 +179,21 @@ cd airbnb_snowflake_dbt_pipeline
 dbt debug
 ```
 
-### 5. Compile and Run Models
+### 5. Execute Snapshots & Models
 ```bash
 # Compile and check DAG
 dbt compile
 
-# Run Bronze models
-dbt run --select bronze
+# Run Type-2 SCD Snapshots
+dbt snapshot
 
-# Run Silver models and tests
+# Run all models and tests in DAG order
+dbt build
+
+# Or run specific layers:
 dbt run --select silver
-dbt test --select silver
-
-# Run Gold OBT model and tests
-dbt run --select obt
-dbt test --select obt
+dbt run --select gold
+dbt test
 ```
 
 ---
@@ -181,6 +201,9 @@ dbt test --select obt
 ## 🗺️ Next Steps
 - [x] Develop **Silver Layer**: Data cleansing, handling nulls, type-casting, and business transformations (`silver_bookings`, `silver_listings`, `silver_hosts`).
 - [x] Create reusable Jinja macros for transformations (`multiply`, `tag`, `trimmer`).
-- [x] Implement data quality tests (uniqueness, not-null on primary keys).
+- [x] Implement data quality tests (uniqueness, not-null, referential integrity).
 - [x] Build **Gold Layer - OBT**: Denormalized One Big Table (`obt`) combining Silver layer models using dynamic Jinja loops.
-- [ ] Build **Gold Layer - Star Schema**: Dimensional fact and dimension models (`fact_bookings`, `dim_listings`, `dim_hosts`).
+- [x] Build **Gold Layer - Star Schema**: Dimensional fact table (`facts`) and SCD Type 2 dimensions (`dim_bookings`, `dim_listings`, `dim_hosts`).
+- [x] Implement Shift-Left **Source Guardrails**: `source_tests.sql` for raw S3 ingestion validation.
+- [ ] Implement CI/CD automated pipeline via GitHub Actions for automated `dbt test` and `dbt build`.
+- [ ] Connect BI Semantic Layer / Tableau / Metabase to `AIRBNB.gold`.

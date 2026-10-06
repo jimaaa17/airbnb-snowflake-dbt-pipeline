@@ -1,7 +1,7 @@
 {% set configs = [
     {
         "table": ref('silver_bookings'),
-        "columns": "SILVER_bookings.BOOKING_ID, SILVER_bookings.BOOKING_DATE, SILVER_bookings.TOTAL_AMOUNT, SILVER_bookings.BOOKING_STATUS, SILVER_bookings.CREATED_AT AS BOOKING_CREATED_AT",
+        "columns": "SILVER_bookings.BOOKING_ID, SILVER_bookings.BOOKING_DATE, SILVER_bookings.CLEANING_FEE, SILVER_bookings.SERVICE_FEE, SILVER_bookings.TOTAL_AMOUNT, SILVER_bookings.BOOKING_STATUS, SILVER_bookings.CREATED_AT AS BOOKING_CREATED_AT",
         "alias": "SILVER_bookings"
     },
     {
@@ -12,7 +12,7 @@
     },
     {
         "table": ref('silver_hosts'),
-        "columns": "SILVER_hosts.HOST_ID, SILVER_hosts.HOST_NAME, SILVER_hosts.HOST_SINCE, SILVER_hosts.RESPONSE_RATE, SILVER_hosts.RESPONSE_RATE_BAND, SILVER_hosts.CREATED_AT AS HOST_CREATED_AT",
+        "columns": "SILVER_hosts.HOST_ID, SILVER_hosts.HOST_NAME, SILVER_hosts.IS_SUPERHOST, SILVER_hosts.HOST_SINCE, SILVER_hosts.RESPONSE_RATE, SILVER_hosts.RESPONSE_RATE_BAND, SILVER_hosts.CREATED_AT AS HOST_CREATED_AT",
         "alias": "SILVER_hosts",
         "join_condition": "SILVER_listings.HOST_ID = SILVER_hosts.HOST_ID"
     }
