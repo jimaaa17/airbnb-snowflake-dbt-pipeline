@@ -1,230 +1,244 @@
-# 🏡 Airbnb Snowflake dbt Pipeline
+# 🏡 Airbnb Snowflake dbt Pipeline & Semantic Intelligence Platform
 
-An end-to-end data transformation and analytics pipeline for Airbnb data on Snowflake, modeled using **dbt** with a **Medallion (Bronze → Silver → Gold) Architecture**.
+An enterprise-grade, end-to-end data transformation, semantic layer, and predictive intelligence platform for Airbnb data on Snowflake. Built using **dbt Medallion Architecture**, **dbt Semantic Layer / MetricFlow**, **FastAPI Semantic Gateway**, **Scikit-Learn ML Pipelines**, and **Airbnb Analytics Studio (Streamlit)**.
 
 ---
 
 ## 📌 Project Overview
 
-This project implements an end-to-end ELT data pipeline for Airbnb datasets using **AWS S3**, **Snowflake**, and **dbt** with a **Medallion Architecture**:
+This platform transforms raw marketplace event streams from **AWS S3** into certified **Snowflake** data marts, provides governed **Metrics-as-Code**, and serves real-time predictive microservices and executive decision workflows:
 
 ```text
-Source Data (CSV) ──> AWS S3 ──> Snowflake (Staging) ──> Bronze Layer ──> Silver Layer ──> Gold Layer
-                                          │                     │               │              │
-                                     Raw Tables            Raw Ingestion   Cleaned Data    Analytics
+AWS S3 ──► Snowflake Staging ──► Bronze Layer ──► Silver Layer ──► Gold Layer (OBT & SCD2)
+                                                                           │
+                                                                           ▼
+                                                             dbt Semantic Layer (MetricFlow)
+                                                                           │
+                                       ┌───────────────────────────────────┴───────────────────────────────────┐
+                                       ▼                                                                       ▼
+                         FastAPI Semantic Gateway (:8000)                                   Airbnb Analytics Studio (:8502)
+                         • REST Endpoints & Postman Suite                                   • Executive Overview & KPIs
+                         • Governed Dynamic SQL Execution                                   • Diagnostic RCA & A/B Engine
+                         • Point-in-Time ML Feature Serving                                 • Predictive Dynamic Pricing & ML
+                                                                                            • Self-Service Explorer & Catalog
 ```
 
-- **Source Data (CSV)**: Raw Airbnb CSV files (`listings.csv`, `bookings.csv`, `hosts.csv`).
-- **AWS S3**: Cloud object storage acting as the external landing and staging repository.
-- **Snowflake (Staging Layer)**: Raw relational tables in `AIRBNB.staging` loaded via Snowflake external stages / `COPY INTO`.
-- **Bronze Layer (`AIRBNB.bronze`)**: Incremental 1-to-1 raw ingestion models managed by dbt.
-- **Silver Layer (`AIRBNB.silver`)**: Cleaned, standardized, and enriched models applying business transformation macros.
-- **Gold Layer (`AIRBNB.gold`)**: High-performance analytical fact and dimension models optimized for BI and metrics.
+- **Source Ingestion (`AIRBNB.staging`)**: Raw tables loaded from AWS S3 (`listings`, `bookings`, `hosts`) via external stage `COPY INTO`.
+- **Bronze Layer (`AIRBNB.bronze`)**: Incremental 1-to-1 schema casting with `CREATED_AT` watermark filtering.
+- **Silver Layer (`AIRBNB.silver`)**: Enriched, standardized models utilizing macros (`multiply`, `tag`, `trimmer`) and deduplication on `*_ID`.
+- **Gold Marts (`AIRBNB.gold`)**: Denormalized One Big Table (`obt`), dimensional fact table (`facts`), and SCD Type 2 dimension snapshots (`dim_*`).
+- **Semantic Layer**: Central Single Source of Truth (SSOT) defined in [`semantic_models.yml`](airbnb_snowflake_dbt_pipeline/models/gold/semantic_models.yml) eliminating cross-departmental metric drift.
+- **FastAPI Semantic Gateway**: High-performance REST service exposing governed metric queries and data catalogs.
+- **Predictive ML Pipelines**: Chronological As-Of Feature Store (Zipline pattern), Dynamic Price Regressor ($R^2 = 0.9483$), and Booking Cancellation Propensity Classifier.
+- **Airbnb Analytics Studio**: Corporate-themed multi-page Streamlit application delivering executive analytics, diagnostic RCA, and interactive ML inference.
 
 ---
 
-## 🏗️ Architecture & Data Flow
+## 🏗️ Architecture & Multimodal Serving Flow
 
 ```mermaid
-flowchart LR
-    CSV["📄 Source Data<br/>(CSV Files)"]
-    S3[("☁️ AWS S3<br/>(Landing Zone)")]
-    
-    subgraph Snowflake ["Snowflake Cloud Data Platform (AIRBNB DB)"]
-        subgraph Staging ["Staging Layer (staging)"]
-            RAW[("Raw Tables<br/>• listings<br/>• bookings<br/>• hosts")]
-        end
-
-        subgraph Bronze ["Bronze Layer (bronze)"]
-            BRZ["Raw Ingestion<br/>• bronze_listings<br/>• bronze_bookings<br/>• bronze_hosts"]
-        end
-
-        subgraph Silver ["Silver Layer (silver)"]
-            SLV["Cleaned Data<br/>• Type Casting<br/>• Macro Transformations<br/>• Null Handling"]
-        end
-
-        subgraph Gold ["Gold Layer (gold)"]
-            GLD["Analytics Layer<br/>• Fact Bookings<br/>• Dim Listings & Hosts<br/>• Business Metrics"]
-        end
+flowchart TD
+    subgraph DataEngineering["1. Data Ingestion & Transformation (Snowflake + dbt)"]
+        CSV["📄 S3 CSVs"] -->|"COPY INTO"| STG["AIRBNB.staging"]
+        STG -->|"Watermark"| BRZ["AIRBNB.bronze"]
+        BRZ -->|"Macros & Dedup"| SLV["AIRBNB.silver"]
+        SLV -->|"Denormalize"| OBT["AIRBNB.gold.obt"]
+        SLV -->|"SCD Type 2"| DIM["AIRBNB.gold.dim_*"]
+        OBT & DIM --> FACTS["AIRBNB.gold.facts"]
     end
 
-    CSV --> S3
-    S3 -->|"COPY INTO / Stage"| RAW
-    RAW -->|"dbt source()"| BRZ
-    BRZ -->|"dbt ref() / Incremental"| SLV
-    SLV -->|"dbt ref() / Dimensional"| GLD
+    subgraph SemanticGov["2. Governed Metrics-as-Code (dbt Semantic Layer)"]
+        OBT --> MetricFlow["dbt MetricFlow Semantic Models<br/>(Single Source of Truth)"]
+    end
+
+    subgraph Intelligence["3. Predictive ML & Feature Store"]
+        OBT --> FS["Point-in-Time Feature Store<br/>(30-Day Sliding As-Of Joins)"]
+        FS --> PR["Dynamic Price Regressor<br/>(R² = 0.9483, MAPE = 10.3%)"]
+        FS --> CR["Cancellation Risk Classifier<br/>(Stratified Gradient Boosting)"]
+    end
+
+    subgraph Consumption["4. Multimodal Consumption Surfaces"]
+        MetricFlow --> API["FastAPI Semantic Gateway (:8000)<br/>• /api/v1/metrics/query<br/>• /api/v1/catalog<br/>• Automated Postman Suite"]
+        MetricFlow & PR & CR --> Studio["Airbnb Analytics Studio (:8502)<br/>• 📈 Executive Overview<br/>• 🔬 Diagnostic RCA & A/B Engine<br/>• ⚡ Self-Service Metric Explorer<br/>• 🎯 Predictive ML Studio<br/>• 📚 Catalog & Lineage Hub"]
+    end
 ```
 
-### ✅ Completed Work:
+---
+
+## ✅ Completed Milestones
+
 1. **Modern Python & Tooling Environment**:
-   - Packaged and managed using **Astral `uv`** on Python 3.12.
-   - Core libraries: `dbt-core (v1.12.5)`, `dbt-snowflake (v1.12.1)`, `boto3`.
-2. **Snowflake Integration**:
-   - Configured dbt Snowflake adapter connected to database `AIRBNB` and warehouse `SNOWFLAKE_LEARNING_WH`.
-3. **Custom Schema Control**:
-   - Custom `generate_schema_name` macro implemented to route tables directly into their dedicated schemas (`bronze`, `silver`, `gold`) without default schema prefixes.
-4. **Source Declarations**:
-   - Structured `sources.yml` mapping `AIRBNB.staging` tables (`listings`, `bookings`, `hosts`).
-5. **Bronze Layer Ingestion**:
-   - Models created for `bronze_listings`, `bronze_bookings`, and `bronze_hosts`.
-   - Materialization configured as `incremental` utilizing dbt's `is_incremental()` macro with timestamp watermarking on `CREATED_AT`.
-6. **Silver Layer Cleansing & Enrichment**:
-   - Models created for `silver_bookings`, `silver_listings`, and `silver_hosts` (incremental).
-   - DRY Jinja macros developed: `multiply` (dynamic rounding), `tag` (tier bucketing), `trimmer` (string trimming).
-   - Schema tests configured (`unique`, `not_null` on all primary keys).
-7. **Gold Layer (One Big Table - OBT)**:
-   - Denormalized wide table `obt` joining bookings, listings, and hosts using dynamic Jinja loops.
-   - Fully tested with primary key uniqueness and non-null referential integrity tests.
-8. **Gold Layer (Star Schema & SCD Type 2 Snapshots)**:
-   - **Type-2 Slowly Changing Dimensions (SCD2)**: Implemented `dim_bookings`, `dim_listings`, and `dim_hosts` using modern dbt YAML snapshots with active sentinel date (`to_date('9999-12-31')`).
-   - **Ephemeral Staging**: Modularized ephemeral pre-processing models in `models/gold/ephemeral/` (`bookings.sql`, `listings.sql`, `hosts.sql`) to decouple entity grains.
-   - **Dimensional Fact Table**: Implemented `facts.sql` using a DRY metadata-driven Jinja framework to join core booking metrics with dimension snapshots.
-9. **Source Data Quality & Shift-Left Guardrails**:
-   - Implemented `tests/source_tests.sql` to catch null keys, non-positive nights, negative fees, and out-of-range response rates at the raw S3 ingestion layer before downstream processing.
-   - Restored end-to-end lineage for `IS_SUPERHOST`, `CLEANING_FEE`, and `SERVICE_FEE` across Silver and Gold.
-
-10. **CI/CD Automation via GitHub Actions**:
-    - Automated pull request validation: executes `dbt debug`, `dbt compile`, and `dbt test` to block regressions before merge.
-    - Automated production deployment on `main`: executes `dbt snapshot` and `dbt build` across the entire pipeline.
-    - Secure secrets management: injected credentials (`SNOWFLAKE_ACCOUNT`, `SNOWFLAKE_USER`, `SNOWFLAKE_PASSWORD`, etc.) via GitHub Actions Secrets.
-
----
-
-## 🔄 CI/CD Automation (GitHub Actions)
-
-The repository includes a production-grade CI/CD pipeline in [`.github/workflows/dbt_ci_cd.yml`](.github/workflows/dbt_ci_cd.yml):
-
-```text
-[ Developer PR ] ──> GitHub Actions CI ──> dbt debug ──> dbt compile ──> dbt test ──> [ Merge Allowed ]
-                                                                                             │
-[ Push to Main ] ──> GitHub Actions CD ──> dbt snapshot (SCD2) ──> dbt build (All Layers) ──┘
-```
-
-* **On Pull Request (`main`)**: Fast regression checks running `dbt test` against the staging/bronze/silver/gold layers.
-* **On Push (`main`)**: Production execution building snapshots and models in DAG order (`dbt build`).
-* **Manual Trigger (`workflow_dispatch`)**: Run ad-hoc commands (`build`, `test`, `snapshot`, `compile`) directly from GitHub Actions UI.
+   - Managed via Astral **`uv`** on Python 3.12 with deterministic lockfiles.
+   - Core libraries: `dbt-core`, `dbt-snowflake`, `fastapi`, `uvicorn`, `streamlit`, `scikit-learn`, `joblib`.
+2. **Snowflake Custom Schema Control**:
+   - Custom `generate_schema_name` macro ensures exact schema names (`bronze`, `silver`, `gold`) without default target prefixes.
+3. **Bronze Layer Ingestion**:
+   - Incremental watermark models for `bronze_listings`, `bronze_bookings`, and `bronze_hosts` filtering on `CREATED_AT`.
+4. **Silver Layer Cleansing & Business Macros**:
+   - Standardized Jinja macros: `multiply` (rounded arithmetic), `tag` (price tier classification), `trimmer` (whitespace sanitization).
+   - Merge deduplication on primary keys (`unique_key`).
+5. **Gold Marts (One Big Table & SCD Type 2 Star Schema)**:
+   - Denormalized wide table `obt` joining bookings, listings, and hosts with **zero fan-out guarantees**.
+   - SCD Type 2 dimension snapshots (`dim_bookings`, `dim_listings`, `dim_hosts`) using active sentinel dates (`to_date('9999-12-31')`).
+   - Dimensional fact table `facts` joining core transactions to dimension snapshots.
+6. **Data Quality & Ingestion Guardrails**:
+   - Gatekeeper tests in `tests/source_tests.sql` auditing raw S3 ingestion.
+   - Cross-layer reconciliation tests verifying `COUNT(bronze) == COUNT(silver) == COUNT(obt)`. 82 of 82 dbt tests passing in CI/CD.
+7. **CI/CD Automation via GitHub Actions**:
+   - Pull request validation workflows running `dbt compile` and `dbt test`.
+   - Production deployment pipeline running `dbt snapshot` and `dbt build`.
+8. **dbt Semantic Layer / MetricFlow Implementation**:
+   - Standardized semantic models in [`semantic_models.yml`](airbnb_snowflake_dbt_pipeline/models/gold/semantic_models.yml) eliminating cross-team "Metric Drift".
+9. **FastAPI Semantic Gateway**:
+   - High-throughput REST microservices at `http://localhost:8000` with Swagger docs (`/docs`) and complete Postman collection.
+10. **Predictive Machine Learning Pipelines**:
+    - Chronological As-Of Feature Store preventing lookahead data leakage.
+    - Gradient Boosting Dynamic Price Regressor ($R^2 = 0.9483$, MAPE $10.34\%$) and Cancellation Classifier.
+    - Automated CI/CD evaluation gatekeeper script ([`ml/evaluation/eval_gate.py`](ml/evaluation/eval_gate.py)).
+11. **Airbnb Analytics Studio (Streamlit Data App)**:
+    - Enterprise BI application at `http://localhost:8502` adhering to Airbnb's corporate design language.
 
 ---
 
-## 📂 Project Structure
+## 🛡️ Governed Semantic Metrics (SSOT)
+
+All metrics queried through the API or viewed in the Analytics Studio are certified against governed business logic:
+
+| Metric Identifier | Display Name | Certified Formula | Accountable Owner | Business Tier |
+| :--- | :--- | :--- | :--- | :--- |
+| `total_revenue` | Gross Bookings Revenue | `SUM(TOTAL_AMOUNT)` | Finance & Strategy | Tier-1 Executive KPI |
+| `booking_conversion_rate` | Booking Conversion Rate | `COUNT(confirmed) / COUNT(total) * 100` | Product Growth | Tier-1 Executive KPI |
+| `average_booking_value` | Average Booking Value (ABV) | `SUM(TOTAL_AMOUNT) / COUNT(BOOKING_ID)` | Commercial Operations | Tier-1 Commercial |
+| `cancellation_rate` | Cancellation Rate | `COUNT(cancelled) / COUNT(total) * 100` | Trust & Safety Operations | Risk & Operations |
+| `total_bookings` | Total Reservations Volume | `COUNT(BOOKING_ID)` | Global Operations | Tier-2 Operational |
+| `active_listings_count` | Available Supply Count | `COUNT(DISTINCT LISTING_ID)` | Supply & Host Growth | Supply Health |
+
+---
+
+## 🤖 Predictive Machine Learning & Decision Engine
+
+Modeled after **Airbnb's Zipline Feature Store**, the predictive subsystem transforms historical mart records into point-in-time training snapshots and real-time inference microservices.
+
+### 1. Dynamic Fair-Price Regressor
+* **Model**: Gradient Boosting Regressor with Scikit-learn Pipeline preprocessors.
+* **Accuracy**: **$R^2 = 0.9483$**, **$\text{MAPE} = 10.34\%$**, $\text{MAE} = \$20.54$.
+* **Yield Guardrails**: Enforces dynamic pricing guardrails (Floor: **$-15\%$**, Ceiling: **$+25\%$**) to maximize occupancy and defend host revenue yield.
+
+### 2. Booking Cancellation Risk Classifier
+* **Model**: Stratified Gradient Boosting Classifier.
+* **Intervention Matrix**: Automatically scores new reservations to trigger proactive retention offers (e.g., non-refundable discount locks or flexible rebooking credits) for high-risk bookings.
+
+### 3. Automated Quality Gate (`eval_gate.py`)
+All retraining pipelines enforce automated quality gates before serializing artifacts to `ml/artifacts/`:
+* Regression Gate: $R^2 \ge 0.85$ and $\text{MAPE} \le 20.0\%$
+* Classification Gate: Accuracy $\ge 60.0\%$
+
+---
+
+## 💻 Airbnb Analytics Studio (Streamlit App)
+
+The Analytics Studio (`apps/semantic_bi_app.py`) provides a modular enterprise user interface across 5 distinct operational workspaces:
+
+1. **📈 Executive Overview**: High-level financial KPIs, YoY deltas, and geographic performance cards.
+2. **🔬 Diagnostic RCA & A/B Engine**: Multi-dimensional variance attribution and two-sample Z-test statistical significance calculator.
+3. **⚡ Self-Service Metric Explorer**: Slice and dice governed metrics with zero raw SQL writing and inspected MetricFlow queries.
+4. **🎯 Predictive ML Studio**: Interactive night-rate estimator with yield guardrails and reservation cancellation risk scorer.
+5. **📚 Catalog & Lineage Hub**: Certified metric ownership directory, dbt test monitor (82/82 passing), and interactive Medallion DAG.
+
+---
+
+## 📂 Project Directory Structure
 
 ```text
 Airbnb Snowflake DBT Pipeline/
-├── pyproject.toml                         # Project metadata and dependencies (managed via uv)
-├── uv.lock                                # Deterministic lockfile
-├── .gitignore                             # Ignored credentials, venvs, and build artifacts
-├── README.md                              # Project documentation
+├── pyproject.toml                                # Project metadata and dependencies (Astral uv)
+├── uv.lock                                       # Deterministic lockfile
+├── .gitignore                                    # Ignored credentials, venvs, and artifacts
+├── README.md                                     # Main project documentation
 │
-└── airbnb_snowflake_dbt_pipeline/        # Core dbt project
-    ├── dbt_project.yml                    # dbt project configuration & schema mapping
-    ├── profiles.yml                       # Connection profile (git-ignored for security)
-    │
-    ├── macros/
-    │   ├── generate_schema_name.sql       # Custom macro for clean bronze/silver/gold schemas
-    │   ├── multiply.sql                   # Dynamic precision multiplication macro
-    │   ├── tag.sql                        # Conditional price tier bucketing macro
-    │   └── trim.sql                       # Reusable whitespace trimming macro
-    │
-    ├── models/
-    │   ├── sources/
-    │   │   └── sources.yml                # Raw staging source definitions
-    │   ├── bronze/                        # Bronze layer models (incremental)
-    │   │   ├── bronze_listings.sql
-    │   │   ├── bronze_bookings.sql
-    │   │   ├── bronze_hosts.sql
-    │   │   └── properties.yml
-    │   ├── silver/                        # Silver layer models (incremental)
-    │   │   ├── silver_bookings.sql
-    │   │   ├── silver_listings.sql
-    │   │   ├── silver_hosts.sql
-    │   │   └── properties.yml
-    │   └── gold/                          # Gold layer models (analytical marts)
-    │       ├── obt.sql                    # One Big Table (OBT) denormalized mart
-    │       ├── facts.sql                  # Central dimensional fact table
-    │       ├── ephemeral/                 # Ephemeral deduplicated dimension feeds
-    │       │   ├── bookings.sql
-    │       │   ├── listings.sql
-    │       │   └── hosts.sql
-    │       └── properties.yml
-    │
-    ├── analyses/                          # Ad-hoc exploratory queries & Jinja experiments
-    ├── snapshots/                         # SCD Type 2 YAML snapshot definitions
-    │   ├── dim_bookings.yml
-    │   ├── dim_listings.yml
-    │   └── dim_hosts.yml
-    └── tests/                             # Custom singular and gatekeeper data tests
-        ├── source_tests.sql               # S3/Staging ingestion guardrail
-        ├── assert_bronze_silver_row_counts_match.sql
-        ├── assert_obt_row_count_matches_bookings.sql
-        ├── assert_total_amount_is_positive.sql
-        ├── assert_response_rate_in_range.sql
-        └── assert_listing_price_and_capacity.sql
+├── airbnb_snowflake_dbt_pipeline/                # Core dbt transformation project
+│   ├── dbt_project.yml                           # dbt project configuration & schema mapping
+│   ├── macros/                                   # Jinja transformation macros
+│   │   ├── generate_schema_name.sql              # Clean bronze/silver/gold schema routing
+│   │   ├── multiply.sql                          # Precision multiplication macro
+│   │   ├── tag.sql                               # Price tier bucketing macro
+│   │   └── trim.sql                              # Whitespace trimming macro
+│   ├── models/
+│   │   ├── sources/sources.yml                   # Raw staging source definitions
+│   │   ├── bronze/                               # Incremental bronze models
+│   │   ├── silver/                               # Standardized silver models
+│   │   └── gold/                                 # Gold marts, OBT, facts, semantic_models.yml
+│   ├── snapshots/                                # SCD Type 2 YAML snapshot definitions
+│   └── tests/                                    # Gatekeeper and reconciliation data tests
+│
+├── semantic_api/                                 # FastAPI Semantic Gateway
+│   ├── main.py                                   # REST API endpoints & MetricFlow query router
+│   └── airbnb_semantic_layer_postman_collection.json # Automated Postman test suite
+│
+├── ml/                                           # Predictive Intelligence & Feature Store
+│   ├── features/                                 # Feature Store transformers & definitions
+│   ├── models/                                   # Gradient Boosting regression & classification
+│   ├── evaluation/eval_gate.py                   # Automated CI/CD model evaluation gate
+│   ├── inference/service.py                      # Real-time inference microservice
+│   ├── train_all.py                              # Master end-to-end training pipeline
+│   └── artifacts/                                # Serialized models (git-ignored)
+│
+├── apps/                                         # Airbnb Analytics Studio (Streamlit App)
+│   ├── semantic_bi_app.py                        # Main multi-page navigation shell
+│   ├── components/                               # Reusable UI components, header & theme
+│   ├── assets/                                   # Authentic Airbnb Bélo vector & PNG branding
+│   └── views/                                    # 5 dedicated workspace modules
+│       ├── executive_overview.py
+│       ├── diagnostic_rca.py
+│       ├── metric_explorer.py
+│       ├── predictive_studio.py
+│       └── catalog_hub.py
+│
+└── docs/                                         # In-depth architectural & business reports
+    ├── SEMANTIC_ARCHITECTURE_AND_ML_REPORT.md    # SME architectural guide & workflows
+    └── semantic_layer_and_predictive_roadmap.md  # Engineering roadmap & design patterns
 ```
 
 ---
 
-## 🚀 Getting Started
+## 🚀 Quickstart & Execution Commands
 
-### 1. Prerequisites
-- [uv](https://docs.astral.sh/uv/) installed: `brew install uv`
-- Access to a Snowflake account with appropriate database and warehouse privileges.
-
-### 2. Install Dependencies
+### 1. Install Environment
 ```bash
 uv sync
 source .venv/bin/activate
 ```
 
-### 3. Configure Connection Profile
-Ensure your `~/.dbt/profiles.yml` or `airbnb_snowflake_dbt_pipeline/profiles.yml` is configured:
-
-```yaml
-airbnb_snowflake_dbt_pipeline:
-  target: dev
-  outputs:
-    dev:
-      type: snowflake
-      account: <YOUR_SNOWFLAKE_ACCOUNT>
-      user: <YOUR_USERNAME>
-      password: <YOUR_PASSWORD>   # Or use private_key_path for key-pair auth
-      role: ACCOUNTADMIN
-      warehouse: SNOWFLAKE_LEARNING_WH
-      database: AIRBNB
-      schema: dbt_schema
-      threads: 1
-```
-
-### 4. Validate Setup
+### 2. Run dbt Pipeline (Snowflake)
 ```bash
 cd airbnb_snowflake_dbt_pipeline
-dbt debug
+dbt debug                                         # Verify Snowflake connection
+dbt build                                         # Run snapshots, models, and tests in DAG order
+cd ..
 ```
 
-### 5. Execute Snapshots & Models
+### 3. Launch FastAPI Semantic Gateway
 ```bash
-# Compile and check DAG
-dbt compile
+uv run python -m uvicorn semantic_api.main:app --host 0.0.0.0 --port 8000 --reload
+# Access Interactive Swagger Docs: http://localhost:8000/docs
+```
 
-# Run Type-2 SCD Snapshots
-dbt snapshot
+### 4. Train Predictive Machine Learning Models
+```bash
+uv run python ml/train_all.py
+# Runs Feature Store aggregations, model training, and passes eval_gate.py
+```
 
-# Run all models and tests in DAG order
-dbt build
-
-# Or run specific layers:
-dbt run --select silver
-dbt run --select gold
-dbt test
+### 5. Launch Airbnb Analytics Studio (Streamlit)
+```bash
+uv run streamlit run apps/semantic_bi_app.py
+# Access Web Application: http://localhost:8502
 ```
 
 ---
 
-## 🗺️ Next Steps
-- [x] Develop **Silver Layer**: Data cleansing, handling nulls, type-casting, and business transformations (`silver_bookings`, `silver_listings`, `silver_hosts`).
-- [x] Create reusable Jinja macros for transformations (`multiply`, `tag`, `trimmer`).
-- [x] Implement data quality tests (uniqueness, not-null, referential integrity).
-- [x] Build **Gold Layer - OBT**: Denormalized One Big Table (`obt`) combining Silver layer models using dynamic Jinja loops.
-- [x] Build **Gold Layer - Star Schema**: Dimensional fact table (`facts`) and SCD Type 2 dimensions (`dim_bookings`, `dim_listings`, `dim_hosts`).
-- [x] Implement Shift-Left **Source Guardrails**: `source_tests.sql` for raw S3 ingestion validation.
-- [x] Implement CI/CD automated pipeline via GitHub Actions for automated `dbt test` and `dbt build`.
-- [ ] Connect BI Semantic Layer / Tableau / Metabase to `AIRBNB.gold`.
+## 📖 Additional Documentation & Executive Reports
+
+* 📄 **[SME Architecture & Workflow Guide](docs/SEMANTIC_ARCHITECTURE_AND_ML_REPORT.md)**: Detailed step-by-step SME workflows, mathematical formulations, and metric drift analysis.
+* 📄 **[Semantic Layer & Predictive Roadmap](docs/semantic_layer_and_predictive_roadmap.md)**: Engineering design patterns, Zipline feature store architecture, and Stage 4 Agentic AI vision.
+* 📄 **[Business Value & ROI Report](file:///Users/jimitnaik/.gemini/antigravity-ide/brain/668df43e-3a1c-4c68-97e8-dac55235cc48/airbnb_analytics_studio_business_value_report.md)**: Executive translation of analytics insights, commercial impact, and ROI model.
