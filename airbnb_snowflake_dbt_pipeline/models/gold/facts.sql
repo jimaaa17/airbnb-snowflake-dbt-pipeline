@@ -7,14 +7,14 @@
     {
         "table": ref('dim_listings'),
         "columns": "",
-        "alias": "GOLD_LISTINGS",
-        "join_condition": "obt.LISTING_ID = DIM_LISTINGS.LISTING_ID"
+        "alias": "dim_listings",
+        "join_condition": "obt.LISTING_ID = dim_listings.LISTING_ID"
     },
     {
         "table": ref('dim_hosts'),
         "columns": "",
-        "alias": "GOLD_HOSTS",
-        "join_condition": "obt.HOST_ID = DIM_HOSTS.HOST_ID"
+        "alias": "dim_hosts",
+        "join_condition": "obt.HOST_ID = dim_hosts.HOST_ID"
     }
 ] %}
 
