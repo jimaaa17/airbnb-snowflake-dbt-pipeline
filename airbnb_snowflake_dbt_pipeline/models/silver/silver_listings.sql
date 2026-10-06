@@ -14,7 +14,7 @@ SELECT
     BEDROOMS,
     BATHROOMS,
     PRICE_PER_NIGHT,
-    {{ tag('PRICE_PER_NIGHT') }} AS PRICE_PER_NIGHT_TAG,
+    {{ tag('CAST(PRICE_PER_NIGHT AS INT)')}} AS PRICE_PER_NIGHT_TAG,
     CREATED_AT
 FROM {{ ref('bronze_listings') }}
 

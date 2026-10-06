@@ -48,6 +48,9 @@ models:
       - name: HOST_NAME
         data_tests:
           - not_null
+      - name: IS_SUPERHOST
+        data_tests:
+          - not_null
       - name: CREATED_AT
         data_tests:
           - not_null

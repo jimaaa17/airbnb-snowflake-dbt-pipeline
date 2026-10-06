@@ -17,6 +17,15 @@ models:
         description: "Foreign key to the host."
         data_tests:
           - not_null
+      - name: IS_SUPERHOST
+        data_tests:
+          - not_null
+      - name: CLEANING_FEE
+        data_tests:
+          - not_null
+      - name: SERVICE_FEE
+        data_tests:
+          - not_null
       - name: TOTAL_AMOUNT
         data_tests:
           - not_null
@@ -41,3 +50,37 @@ models:
           - accepted_values:
               arguments:
                 values: ['VERY GOOD', 'GOOD', 'AVERAGE', 'POOR']
+
+  - name: facts
+    description: "Dimensional central fact table joining booking transaction metrics to dim_listings and dim_hosts."
+    columns:
+      - name: BOOKING_ID
+        description: "Primary key for facts (Booking ID)."
+        data_tests:
+          - unique
+          - not_null
+      - name: LISTING_ID
+        description: "Foreign key referencing dim_listings."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_listings')
+                field: LISTING_ID
+      - name: HOST_ID
+        description: "Foreign key referencing dim_hosts."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_hosts')
+                field: HOST_ID
+      - name: CLEANING_FEE
+        data_tests:
+          - not_null
+      - name: SERVICE_FEE
+        data_tests:
+          - not_null
+      - name: TOTAL_AMOUNT
+        data_tests:
+          - not_null

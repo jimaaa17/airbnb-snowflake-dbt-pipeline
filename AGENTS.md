@@ -40,16 +40,20 @@ SQL formatting: `sqlfmt` is a dependency (`sqlfmt models/`).
   - Bronze reads `{{ source('staging', ...) }}` (declared in `models/sources/sources.yml`) with `SELECT *`.
   - Silver reads `{{ ref('bronze_*') }}` and applies business logic via macros: `multiply(a, b, decimal_places=2)` (rounded product, used for `TOTAL_AMOUNT`), `tag(col)` (LOW/MEDIUM/HIGH price tier at <100/<200), `trimmer(col)`.
   - Gold `obt.sql` is a denormalized One Big Table built from a Jinja list of `{table, columns, alias, join_condition}` dicts looped into a `SELECT ... FROM bookings LEFT JOIN listings LEFT JOIN hosts`. To add an entity to the OBT, append a dict rather than hand-writing SQL.
-- **Grain / keys**: bookings → listings via `LISTING_ID`, listings → hosts via `HOST_ID`. The OBT grain is one row per booking.
+  - Gold `facts.sql` is a dimensional fact model built from a similar Jinja metadata dictionary loop joining booking transactions to dimension snapshots (`dim_listings`, `dim_hosts`).
+  - Gold `ephemeral/` (`bookings.sql`, `listings.sql`, `hosts.sql`) are lightweight ephemeral models (`materialized='ephemeral'`) projecting distinct entity feeds to feed SCD2 snapshots without duplicating table storage.
+  - Snapshots (`snapshots/dim_*.yml`) use modern dbt YAML syntax with `strategy: timestamp` or `strategy: check`, and active sentinel dates (`to_date('9999-12-31')`).
+- **Grain / keys**: bookings → listings via `LISTING_ID`, listings → hosts via `HOST_ID`. The OBT and fact grain is one row per booking.
 - **Column naming**: uppercase Snowflake identifiers (`BOOKING_ID`, `CREATED_AT`).
 
 ## Tests
 
 - Generic tests live in each layer's `properties.yml` using the dbt ≥1.10 syntax: `data_tests:` (not `tests:`) with parameters nested under `arguments:` (e.g. `accepted_values: { arguments: { values: [...] } }`, `relationships: { arguments: { to: ref(...), field: ... } }`). Keep that form when adding tests.
-- Singular tests in `tests/` return failing rows (0 rows = pass). They cover cross-layer invariants: bronze/silver row counts match, OBT row count equals `silver_bookings` (detects join fan-out), plus value-range checks.
+- Singular tests in `tests/` return failing rows (0 rows = pass). They cover cross-layer invariants: bronze/silver row counts match, OBT row count equals `silver_bookings` (detects join fan-out), value-range checks, plus `source_tests.sql` as a raw S3/staging gatekeeper.
 
 ## Notes
 
 - `analyses/` holds scratch/Jinja experiments, not production models.
 - `models/sources/base_staging_bookings.sql` is a scaffolded staging model outside the layer folders, so it falls back to the target's default schema.
-- Planned next step (per README): a gold star schema (`fact_bookings`, `dim_listings`, `dim_hosts`) alongside the OBT.
+- Star schema and SCD Type 2 dimension snapshots are implemented in Gold alongside OBT.
+- Planned next steps: automated CI/CD workflows and BI layer connection.

@@ -20,6 +20,12 @@ models:
       - name: BOOKING_DATE
         data_tests:
           - not_null
+      - name: CLEANING_FEE
+        data_tests:
+          - not_null
+      - name: SERVICE_FEE
+        data_tests:
+          - not_null
       - name: TOTAL_AMOUNT
         description: "Calculated as (nights_booked * booking_amount) + cleaning_fee + service_fee."
         data_tests:
@@ -101,6 +107,10 @@ models:
           - unique
           - not_null
       - name: HOST_NAME
+        data_tests:
+          - not_null
+      - name: IS_SUPERHOST
+        description: "Boolean flag indicating if the host has achieved superhost status."
         data_tests:
           - not_null
       - name: HOST_SINCE
