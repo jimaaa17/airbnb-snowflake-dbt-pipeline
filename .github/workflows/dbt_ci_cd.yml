@@ -1,0 +1,103 @@
+name: dbt CI/CD Pipeline
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'airbnb_snowflake_dbt_pipeline/**'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.github/workflows/**'
+  push:
+    branches: [main]
+    paths:
+      - 'airbnb_snowflake_dbt_pipeline/**'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.github/workflows/**'
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to execute'
+        required: true
+        default: 'build'
+        type: choice
+        options:
+          - build
+          - test
+          - snapshot
+          - compile
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dbt-pipeline:
+    name: Run dbt Pipeline
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./airbnb_snowflake_dbt_pipeline
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: ".python-version"
+
+      - name: Install dependencies via uv
+        run: |
+          uv sync --frozen
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> $GITHUB_PATH
+
+      - name: Configure dbt profiles.yml
+        run: |
+          mkdir -p ~/.dbt
+          cat <<EOF > ~/.dbt/profiles.yml
+          airbnb_snowflake_dbt_pipeline:
+            target: ci
+            outputs:
+              ci:
+                type: snowflake
+                account: "${{ secrets.SNOWFLAKE_ACCOUNT }}"
+                user: "${{ secrets.SNOWFLAKE_USER }}"
+                password: "${{ secrets.SNOWFLAKE_PASSWORD }}"
+                role: "${{ secrets.SNOWFLAKE_ROLE || 'ACCOUNTADMIN' }}"
+                warehouse: "${{ secrets.SNOWFLAKE_WAREHOUSE || 'SNOWFLAKE_LEARNING_WH' }}"
+                database: "${{ secrets.SNOWFLAKE_DATABASE || 'AIRBNB' }}"
+                schema: dbt_schema
+                threads: 4
+          EOF
+
+      - name: Verify Snowflake Connection (dbt debug)
+        run: dbt debug
+
+      - name: Compile dbt DAG
+        run: dbt compile
+
+      - name: Run CI Validation Tests (PRs)
+        if: github.event_name == 'pull_request'
+        run: dbt test
+
+      - name: Run Snapshots (Main Branch / Manual)
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.action == 'snapshot' || github.event.inputs.action == 'build'))
+        run: dbt snapshot
+
+      - name: Run Full Pipeline Build (Main Branch / Manual)
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'build')
+        run: dbt build
+
+      - name: Run Manual Test Execution
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'test'
+        run: dbt test
