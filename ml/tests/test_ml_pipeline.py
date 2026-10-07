@@ -191,3 +191,43 @@ def test_zipline_feature_store_no_lookahead():
     # Third event sees event 0 and event 1 (1 cancel out of 2 bookings)
     assert enriched.loc[2, "trailing_30d_listing_bookings"] == 2
     assert enriched.loc[2, "trailing_30d_listing_cancellations"] == 1
+
+
+def test_zipline_feature_store_outcome_availability_timestamp():
+    """Verify point-in-time outcome availability: past booking's future cancellation is not leaked."""
+    # Event 0 was booked on Jan 1, but cancelled on Jan 15.
+    # Event 1 was booked on Jan 10 (before the cancellation happened).
+    # Event 2 was booked on Jan 20 (after the cancellation happened).
+    data = {
+        "LISTING_ID": ["L1", "L1", "L1"],
+        "BOOKING_CREATED_AT": [
+            pd.Timestamp("2024-01-01"),
+            pd.Timestamp("2024-01-10"),
+            pd.Timestamp("2024-01-20")
+        ],
+        "BOOKING_STATUS": ["cancelled", "confirmed", "confirmed"],
+        "CANCELLED_AT": [
+            pd.Timestamp("2024-01-15"),  # Cancel occurred after Jan 10
+            pd.NaT,
+            pd.NaT
+        ]
+    }
+    df = pd.DataFrame(data)
+    store = ZiplineFeatureStore(window_days=30)
+    enriched = store.compute_as_of_listing_features(df)
+
+    # Event 0: t=Jan 1 -> 0 prior bookings, 0 cancels
+    assert enriched.loc[0, "trailing_30d_listing_bookings"] == 0
+    assert enriched.loc[0, "trailing_30d_listing_cancellations"] == 0
+
+    # Event 1: t=Jan 10 -> sees Event 0 booking, BUT Event 0 has NOT cancelled yet on Jan 10!
+    # Zero temporal leakage: cancellation count must be 0!
+    assert enriched.loc[1, "trailing_30d_listing_bookings"] == 1
+    assert enriched.loc[1, "trailing_30d_listing_cancellations"] == 0
+    assert enriched.loc[1, "trailing_30d_cancellation_rate"] == 0.0
+
+    # Event 2: t=Jan 20 -> Event 0 cancellation occurred on Jan 15, so it is now observable.
+    assert enriched.loc[2, "trailing_30d_listing_bookings"] == 2
+    assert enriched.loc[2, "trailing_30d_listing_cancellations"] == 1
+    assert enriched.loc[2, "trailing_30d_cancellation_rate"] == 0.5
+

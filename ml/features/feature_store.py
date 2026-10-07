@@ -28,11 +28,14 @@ class ZiplineFeatureStore:
         trailing_cancellations = np.zeros(n_rows, dtype=int)
         
         # Window calculation: strictly prior to current BOOKING_CREATED_AT
-        # Optimized with grouping for scalability
+        # Enforces point-in-time outcome availability when CANCELLED_AT is present
+        has_cancel_ts = "CANCELLED_AT" in sorted_df.columns and sorted_df["CANCELLED_AT"].notna().any()
+
         for listing_id, group in sorted_df.groupby("LISTING_ID"):
             idxs = group.index.to_numpy()
             timestamps = group["BOOKING_CREATED_AT"].to_numpy()
             is_cancel = (group["BOOKING_STATUS"] == "cancelled").to_numpy().astype(int)
+            cancel_ts_arr = pd.to_datetime(group["CANCELLED_AT"]).to_numpy() if has_cancel_ts else None
 
             for i, curr_idx in enumerate(idxs):
                 curr_time = timestamps[i]
@@ -41,7 +44,20 @@ class ZiplineFeatureStore:
                 # Strictly look back: t < curr_time and t >= window_start
                 mask = (timestamps[:i] >= window_start) & (timestamps[:i] < curr_time)
                 trailing_bookings[curr_idx] = int(np.sum(mask))
-                trailing_cancellations[curr_idx] = int(np.sum(is_cancel[:i][mask]))
+
+                if has_cancel_ts:
+                    # Point-in-time outcome availability guarantee:
+                    # A prior booking's cancellation is ONLY observable at curr_time if the cancellation
+                    # event actually occurred strictly prior to curr_time (cancel_ts < curr_time)
+                    # and within the lookback window (cancel_ts >= window_start).
+                    cancel_mask = (
+                        (~pd.isna(cancel_ts_arr[:i])) &
+                        (cancel_ts_arr[:i] < curr_time) &
+                        (cancel_ts_arr[:i] >= window_start)
+                    )
+                    trailing_cancellations[curr_idx] = int(np.sum(cancel_mask))
+                else:
+                    trailing_cancellations[curr_idx] = int(np.sum(is_cancel[:i][mask]))
 
         sorted_df["trailing_30d_listing_bookings"] = trailing_bookings
         sorted_df["trailing_30d_listing_cancellations"] = trailing_cancellations

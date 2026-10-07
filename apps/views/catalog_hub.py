@@ -74,7 +74,7 @@ def render():
         end
 
         subgraph Semantic["📐 Semantic Layer (MetricFlow)"]
-            sem["Governed Metrics Catalog<br/><i>• total_revenue<br/>• booking_conversion_rate<br/>• cancellation_rate<br/>• avg_booking_value</i>"]
+            sem["Governed Metrics Catalog<br/><i>• total_revenue<br/>• booking_confirmation_rate<br/>• cancellation_rate<br/>• avg_booking_value</i>"]
         end
 
         subgraph ML["🤖 ML & Feature Store (Zipline)"]

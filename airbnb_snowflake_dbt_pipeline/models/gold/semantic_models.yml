@@ -127,9 +127,17 @@ metrics:
     type_params:
       measure: cancelled_booking_count
 
+  - name: booking_confirmation_rate
+    label: "Booking Confirmation Rate"
+    description: "Governed ratio of confirmed bookings to total booking attempts (confirmed bookings / all bookings). Eliminates cross-department metric drift."
+    type: ratio
+    type_params:
+      numerator: confirmed_bookings
+      denominator: total_bookings
+
   - name: booking_conversion_rate
-    label: "Booking Conversion Rate"
-    description: "Governed ratio of confirmed bookings to total booking attempts. Eliminates cross-department metric drift."
+    label: "Booking Conversion Rate (Alias)"
+    description: "Legacy alias for booking_confirmation_rate (ratio of confirmed bookings to total bookings)."
     type: ratio
     type_params:
       numerator: confirmed_bookings

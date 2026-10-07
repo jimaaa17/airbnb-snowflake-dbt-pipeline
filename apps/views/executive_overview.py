@@ -92,7 +92,7 @@ def render():
             lambda x: pd.Series({
                 "Total Revenue ($)": f"${x['TOTAL_AMOUNT'].sum():,.2f}",
                 "Bookings Volume": len(x),
-                "Conversion Rate": f"{(x['BOOKING_STATUS'] == 'confirmed').mean() * 100:.1f}%",
+                "Confirmation Rate": f"{(x['BOOKING_STATUS'] == 'confirmed').mean() * 100:.1f}%",
                 "Average Stay Value": f"${x['TOTAL_AMOUNT'].mean():.2f}",
                 "Active Listings": x["LISTING_ID"].nunique(),
             })

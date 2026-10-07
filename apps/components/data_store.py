@@ -28,12 +28,19 @@ SEMANTIC_METRICS = {
         "tier": "Tier-1 Operational",
         "description": "Gross reservation volume attempted across all global listings."
     },
-    "booking_conversion_rate": {
-        "label": "Booking Conversion Rate",
+    "booking_confirmation_rate": {
+        "label": "Booking Confirmation Rate",
         "formula": "COUNT(confirmed) / COUNT(total) * 100",
         "owner": "Product Growth (SSOT)",
         "tier": "Tier-1 Executive KPI",
-        "description": "Percentage of booking attempts successfully completed without abandonment or cancellation."
+        "description": "Governed ratio of confirmed bookings to total reservation volume (confirmed bookings / all bookings)."
+    },
+    "booking_conversion_rate": {
+        "label": "Booking Conversion Rate (Alias)",
+        "formula": "COUNT(confirmed) / COUNT(total) * 100",
+        "owner": "Product Growth (SSOT)",
+        "tier": "Tier-1 Executive KPI",
+        "description": "Legacy alias for booking_confirmation_rate."
     },
     "cancellation_rate": {
         "label": "Cancellation Rate",

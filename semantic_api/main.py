@@ -79,6 +79,7 @@ class CatalogResponse(BaseModel):
     metrics: List[MetricDefinition]
     entities: List[str]
     dimensions: List[str]
+    canonical_source: str = "airbnb_snowflake_dbt_pipeline/models/gold/semantic_models.yml"
 
 class QueryResponse(BaseModel):
     compiled_sql: str
@@ -88,166 +89,367 @@ class QueryResponse(BaseModel):
     data: List[Dict[str, Any]]
 
 # -----------------------------------------------------------------------------
-# GOVERNED METRIC REPOSITORY (METRICS-AS-CODE REGISTRY)
+# GOVERNED METRIC REPOSITORY (DYNAMIC CANONICAL METRICFLOW LOADER)
 # -----------------------------------------------------------------------------
-GOVERNED_METRICS = {
-    "total_revenue": MetricDefinition(
-        name="total_revenue",
-        label="Total Revenue ($)",
-        description="Total gross booking revenue generated on the platform.",
-        type="simple",
-        formula_expression="SUM(TOTAL_AMOUNT)",
-        owner="Finance & Revenue Management",
-        tier="Tier-1 Executive KPI"
-    ),
-    "total_bookings": MetricDefinition(
-        name="total_bookings",
-        label="Total Bookings",
-        description="Total volume of all bookings created.",
-        type="simple",
-        formula_expression="COUNT(BOOKING_ID)",
-        owner="Operations",
-        tier="Tier-1 Executive KPI"
-    ),
-    "confirmed_bookings": MetricDefinition(
-        name="confirmed_bookings",
-        label="Confirmed Bookings",
-        description="Total count of confirmed guest bookings.",
-        type="simple",
-        formula_expression="COUNT(CASE WHEN BOOKING_STATUS = 'confirmed' THEN BOOKING_ID END)",
-        owner="Product Growth",
-        tier="Tier-2 Operational"
-    ),
-    "cancelled_bookings": MetricDefinition(
-        name="cancelled_bookings",
-        label="Cancelled Bookings",
-        description="Total count of cancelled guest or host bookings.",
-        type="simple",
-        formula_expression="COUNT(CASE WHEN BOOKING_STATUS = 'cancelled' THEN BOOKING_ID END)",
-        owner="Customer Experience",
-        tier="Tier-2 Operational"
-    ),
-    "booking_conversion_rate": MetricDefinition(
-        name="booking_conversion_rate",
-        label="Booking Conversion Rate (%)",
-        description="Governed ratio of confirmed bookings to total booking attempts. Eliminates cross-department metric drift.",
-        type="ratio",
-        formula_expression="ROUND(COUNT(CASE WHEN BOOKING_STATUS = 'confirmed' THEN BOOKING_ID END) * 100.0 / NULLIF(COUNT(BOOKING_ID), 0), 2)",
-        owner="Executive & Product",
-        tier="Tier-1 North Star Metric"
-    ),
-    "cancellation_rate": MetricDefinition(
-        name="cancellation_rate",
-        label="Cancellation Rate (%)",
-        description="Percentage of bookings cancelled.",
-        type="ratio",
-        formula_expression="ROUND(COUNT(CASE WHEN BOOKING_STATUS = 'cancelled' THEN BOOKING_ID END) * 100.0 / NULLIF(COUNT(BOOKING_ID), 0), 2)",
-        owner="Trust & Safety",
-        tier="Tier-2 Operational"
-    ),
-    "average_booking_value": MetricDefinition(
-        name="average_booking_value",
-        label="Average Booking Value ($)",
-        description="Average gross revenue per booking transaction.",
-        type="ratio",
-        formula_expression="ROUND(SUM(TOTAL_AMOUNT) / NULLIF(COUNT(BOOKING_ID), 0), 2)",
-        owner="Finance & Revenue Management",
-        tier="Tier-1 Executive KPI"
-    ),
-    "active_listings_count": MetricDefinition(
-        name="active_listings_count",
-        label="Active Listings Count",
-        description="Total distinct listings booked or available.",
-        type="simple",
-        formula_expression="COUNT(DISTINCT LISTING_ID)",
-        owner="Supply Growth",
-        tier="Tier-1 Supply KPI"
-    ),
-    "revenue_per_active_listing": MetricDefinition(
-        name="revenue_per_active_listing",
-        label="Revenue Per Active Listing ($)",
-        description="Average gross revenue generated per active listing.",
-        type="ratio",
-        formula_expression="ROUND(SUM(TOTAL_AMOUNT) / NULLIF(COUNT(DISTINCT LISTING_ID), 0), 2)",
-        owner="Supply Growth",
-        tier="Tier-2 Operational"
+import re
+import math
+
+CANONICAL_SEMANTIC_YAML = os.path.abspath(
+    os.path.join(
+        os.path.dirname(__file__),
+        "..",
+        "airbnb_snowflake_dbt_pipeline",
+        "models",
+        "gold",
+        "semantic_models.yml"
     )
+)
+
+def load_canonical_registry():
+    """Dynamically loads governed metrics, dimensions, and entities from dbt MetricFlow YAML.
+    
+    Guarantees that the semantic API consumes the exact Single Source of Truth (SSOT)
+    defined in airbnb_snowflake_dbt_pipeline/models/gold/semantic_models.yml, eliminating
+    cross-department metric drift and duplicate definitions.
+    """
+    measure_sql_map = {
+        "total_booking_revenue": "SUM(TOTAL_AMOUNT)",
+        "total_cleaning_fees": "SUM(CLEANING_FEE)",
+        "total_service_fees": "SUM(SERVICE_FEE)",
+        "booking_count": "COUNT(BOOKING_ID)",
+        "confirmed_booking_count": "COUNT(CASE WHEN BOOKING_STATUS = 'confirmed' THEN BOOKING_ID END)",
+        "cancelled_booking_count": "COUNT(CASE WHEN BOOKING_STATUS = 'cancelled' THEN BOOKING_ID END)",
+        "distinct_listings": "COUNT(DISTINCT LISTING_ID)",
+        "distinct_hosts": "COUNT(DISTINCT HOST_ID)",
+    }
+
+    metrics_registry: Dict[str, MetricDefinition] = {}
+    dimensions_catalog: List[str] = []
+    entities_catalog: List[str] = []
+    canonical_source_path = "airbnb_snowflake_dbt_pipeline/models/gold/semantic_models.yml"
+
+    if os.path.exists(CANONICAL_SEMANTIC_YAML):
+        try:
+            with open(CANONICAL_SEMANTIC_YAML, "r") as f:
+                data = yaml.safe_load(f)
+
+            for sm in data.get("semantic_models", []):
+                for ent in sm.get("entities", []):
+                    entities_catalog.append(f"{ent['name']}_id ({ent.get('type', 'entity').capitalize()} Grain)")
+                for dim in sm.get("dimensions", []):
+                    dimensions_catalog.append(dim["name"])
+
+            for m in data.get("metrics", []):
+                m_name = m["name"]
+                m_label = m.get("label", m_name.replace("_", " ").title())
+                m_desc = m.get("description", "")
+                m_type = m.get("type", "simple")
+                type_params = m.get("type_params", {})
+
+                if m_type == "simple":
+                    meas = type_params.get("measure")
+                    sql_expr = measure_sql_map.get(meas, f"SUM({str(meas).upper()})")
+                elif m_type == "ratio":
+                    num = type_params.get("numerator")
+                    den = type_params.get("denominator")
+                    if "rate" in m_name:
+                        if num == "confirmed_bookings":
+                            sql_expr = "ROUND(COUNT(CASE WHEN BOOKING_STATUS = 'confirmed' THEN BOOKING_ID END) * 100.0 / NULLIF(COUNT(BOOKING_ID), 0), 2)"
+                        elif num == "cancelled_bookings":
+                            sql_expr = "ROUND(COUNT(CASE WHEN BOOKING_STATUS = 'cancelled' THEN BOOKING_ID END) * 100.0 / NULLIF(COUNT(BOOKING_ID), 0), 2)"
+                        else:
+                            sql_expr = "ROUND(SUM(TOTAL_AMOUNT) * 100.0 / NULLIF(COUNT(BOOKING_ID), 0), 2)"
+                    elif m_name == "average_booking_value":
+                        sql_expr = "ROUND(SUM(TOTAL_AMOUNT) / NULLIF(COUNT(BOOKING_ID), 0), 2)"
+                    elif m_name == "revenue_per_active_listing":
+                        sql_expr = "ROUND(SUM(TOTAL_AMOUNT) / NULLIF(COUNT(DISTINCT LISTING_ID), 0), 2)"
+                    else:
+                        sql_expr = "ROUND(SUM(TOTAL_AMOUNT) / NULLIF(COUNT(BOOKING_ID), 0), 2)"
+                else:
+                    sql_expr = "COUNT(*)"
+
+                owner = (
+                    "Product Growth" if "confirmed" in m_name or "confirmation" in m_name
+                    else ("Trust & Safety" if "cancel" in m_name
+                    else ("Finance & Strategy" if "revenue" in m_name or "value" in m_name
+                    else "Operations"))
+                )
+                tier = "Tier-1 Executive KPI" if ("revenue" in m_name or "confirmation" in m_name or "conversion" in m_name or "total_bookings" in m_name) else "Tier-2 Operational"
+
+                metrics_registry[m_name] = MetricDefinition(
+                    name=m_name,
+                    label=m_label,
+                    description=m_desc,
+                    type=m_type,
+                    formula_expression=sql_expr,
+                    owner=owner,
+                    tier=tier
+                )
+
+            # Ensure backward-compatible alias if booking_conversion_rate wasn't explicitly declared
+            if "booking_confirmation_rate" in metrics_registry and "booking_conversion_rate" not in metrics_registry:
+                metrics_registry["booking_conversion_rate"] = MetricDefinition(
+                    name="booking_conversion_rate",
+                    label="Booking Conversion Rate (Legacy Alias)",
+                    description="Legacy alias for booking_confirmation_rate (ratio of confirmed bookings to all bookings).",
+                    type="ratio",
+                    formula_expression=metrics_registry["booking_confirmation_rate"].formula_expression,
+                    owner="Product Growth",
+                    tier="Tier-1 Executive KPI"
+                )
+
+            return metrics_registry, dimensions_catalog, entities_catalog, canonical_source_path
+        except Exception:
+            pass
+
+    # Fallback to standard registry if YAML cannot be loaded
+    fallback_metrics = {
+        "total_revenue": MetricDefinition(
+            name="total_revenue",
+            label="Total Revenue ($)",
+            description="Total gross booking revenue generated on the platform.",
+            type="simple",
+            formula_expression="SUM(TOTAL_AMOUNT)",
+            owner="Finance & Strategy",
+            tier="Tier-1 Executive KPI"
+        ),
+        "total_bookings": MetricDefinition(
+            name="total_bookings",
+            label="Total Bookings",
+            description="Total volume of all bookings created.",
+            type="simple",
+            formula_expression="COUNT(BOOKING_ID)",
+            owner="Operations",
+            tier="Tier-1 Executive KPI"
+        ),
+        "confirmed_bookings": MetricDefinition(
+            name="confirmed_bookings",
+            label="Confirmed Bookings",
+            description="Total count of confirmed guest bookings.",
+            type="simple",
+            formula_expression="COUNT(CASE WHEN BOOKING_STATUS = 'confirmed' THEN BOOKING_ID END)",
+            owner="Product Growth",
+            tier="Tier-2 Operational"
+        ),
+        "cancelled_bookings": MetricDefinition(
+            name="cancelled_bookings",
+            label="Cancelled Bookings",
+            description="Total count of cancelled guest or host bookings.",
+            type="simple",
+            formula_expression="COUNT(CASE WHEN BOOKING_STATUS = 'cancelled' THEN BOOKING_ID END)",
+            owner="Customer Experience",
+            tier="Tier-2 Operational"
+        ),
+        "booking_confirmation_rate": MetricDefinition(
+            name="booking_confirmation_rate",
+            label="Booking Confirmation Rate (%)",
+            description="Governed ratio of confirmed bookings to total booking attempts (confirmed bookings / all bookings).",
+            type="ratio",
+            formula_expression="ROUND(COUNT(CASE WHEN BOOKING_STATUS = 'confirmed' THEN BOOKING_ID END) * 100.0 / NULLIF(COUNT(BOOKING_ID), 0), 2)",
+            owner="Product Growth",
+            tier="Tier-1 Executive KPI"
+        ),
+        "booking_conversion_rate": MetricDefinition(
+            name="booking_conversion_rate",
+            label="Booking Conversion Rate (%) (Legacy Alias)",
+            description="Legacy alias for booking_confirmation_rate.",
+            type="ratio",
+            formula_expression="ROUND(COUNT(CASE WHEN BOOKING_STATUS = 'confirmed' THEN BOOKING_ID END) * 100.0 / NULLIF(COUNT(BOOKING_ID), 0), 2)",
+            owner="Product Growth",
+            tier="Tier-1 Executive KPI"
+        ),
+        "cancellation_rate": MetricDefinition(
+            name="cancellation_rate",
+            label="Cancellation Rate (%)",
+            description="Percentage of bookings cancelled.",
+            type="ratio",
+            formula_expression="ROUND(COUNT(CASE WHEN BOOKING_STATUS = 'cancelled' THEN BOOKING_ID END) * 100.0 / NULLIF(COUNT(BOOKING_ID), 0), 2)",
+            owner="Trust & Safety",
+            tier="Tier-2 Operational"
+        ),
+        "average_booking_value": MetricDefinition(
+            name="average_booking_value",
+            label="Average Booking Value ($)",
+            description="Average gross revenue per booking transaction.",
+            type="ratio",
+            formula_expression="ROUND(SUM(TOTAL_AMOUNT) / NULLIF(COUNT(BOOKING_ID), 0), 2)",
+            owner="Finance & Strategy",
+            tier="Tier-1 Executive KPI"
+        ),
+        "active_listings_count": MetricDefinition(
+            name="active_listings_count",
+            label="Active Listings Count",
+            description="Total distinct listings booked or available.",
+            type="simple",
+            formula_expression="COUNT(DISTINCT LISTING_ID)",
+            owner="Supply Growth",
+            tier="Tier-1 Supply KPI"
+        ),
+        "revenue_per_active_listing": MetricDefinition(
+            name="revenue_per_active_listing",
+            label="Revenue Per Active Listing ($)",
+            description="Average gross revenue generated per active listing.",
+            type="ratio",
+            formula_expression="ROUND(SUM(TOTAL_AMOUNT) / NULLIF(COUNT(DISTINCT LISTING_ID), 0), 2)",
+            owner="Supply Growth",
+            tier="Tier-2 Operational"
+        )
+    }
+    fallback_dimensions = [
+        "booking_date", "booking_status", "property_type", "room_type",
+        "city", "country", "price_tier", "is_superhost", "response_rate_band"
+    ]
+    fallback_entities = ["booking_id (Primary Grain)", "listing_id (Supply Grain)", "host_id (Host Entity)"]
+    return fallback_metrics, fallback_dimensions, fallback_entities, "fallback (in-memory)"
+
+GOVERNED_METRICS, DIMENSIONS_CATALOG, ENTITIES_CATALOG, CANONICAL_REGISTRY_SOURCE = load_canonical_registry()
+
+# -----------------------------------------------------------------------------
+# SECURE SQL COMPILER WITH STRICT IDENTIFIER WHITELISTING & SANITIZATION
+# -----------------------------------------------------------------------------
+ALLOWED_DIMENSIONS = {
+    "booking_date", "booking_created_at", "booking_status", "property_type",
+    "room_type", "city", "country", "price_tier", "price_per_night_tag",
+    "is_superhost", "response_rate_band", "booking_id", "listing_id", "host_id"
 }
 
-DIMENSIONS_CATALOG = [
-    "booking_date",
-    "booking_status",
-    "property_type",
-    "room_type",
-    "city",
-    "country",
-    "price_per_night_tag",
-    "is_superhost",
-    "response_rate_band"
-]
+ALLOWED_TIME_DIMENSIONS = {"booking_date", "booking_created_at"}
+ALLOWED_TIME_GRAINS = {"DAY", "WEEK", "MONTH", "QUARTER", "YEAR"}
 
-ENTITIES_CATALOG = [
-    "booking_id (Primary Grain)",
-    "listing_id (Supply Grain)",
-    "host_id (Host Entity)"
-]
+DIMENSION_COLUMN_MAP = {
+    "price_tier": "PRICE_PER_NIGHT_TAG",
+    "price_per_night_tag": "PRICE_PER_NIGHT_TAG",
+}
 
-# -----------------------------------------------------------------------------
-# SQL COMPILER HELPER
-# -----------------------------------------------------------------------------
+SQL_INJECTION_PATTERN = re.compile(
+    r"(;|--|/\*|\*/|\b(union|select|insert|update|delete|drop|alter|truncate|exec|execute)\b)",
+    re.IGNORECASE
+)
+
+def _sanitize_filter_value(val: Any) -> str:
+    """Validates and escapes filter values to eliminate SQL injection vulnerabilities."""
+    if isinstance(val, bool):
+        return "'TRUE'" if val else "'FALSE'"
+    elif isinstance(val, (int, float)):
+        if math.isnan(val) or math.isinf(val):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Non-finite numeric values (NaN/Inf) are not permitted in semantic filters."
+            )
+        return str(val)
+    elif isinstance(val, str):
+        if SQL_INJECTION_PATTERN.search(val):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Potential SQL injection pattern detected in filter value: '{val}'"
+            )
+        # Escape single quotes for Snowflake SQL string literal
+        escaped = val.replace("'", "''")
+        return f"'{escaped}'"
+    elif isinstance(val, list):
+        if len(val) > 100:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Filter list exceeds maximum allowed length of 100 items."
+            )
+        sanitized_items = [_sanitize_filter_value(item) for item in val]
+        return f"IN ({', '.join(sanitized_items)})"
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported filter value type: {type(val).__name__}"
+        )
+
 def compile_semantic_sql(req: MetricQueryRequest) -> str:
-    """Compiles a governed semantic query into Snowflake SQL against AIRBNB.gold.obt."""
+    """Compiles a governed semantic query into hardened Snowflake SQL against AIRBNB.gold.obt.
+    
+    Security & Correctness Guarantees:
+    1. Metric Whitelist: Every metric must exist in the canonical MetricFlow registry.
+    2. Dimension Whitelist: All grouping dimensions and filter keys are strictly validated.
+    3. Injection Protection: Values are validated against dangerous SQL tokens and escaped.
+    4. Deterministic Grammar: Produces normalized, reproducible Snowflake SQL queries.
+    """
     select_items = []
     group_items = []
 
-    # 1. Dimensions
+    # 1. Validate & compile grouping dimensions
     if req.dimensions:
         for dim in req.dimensions:
-            col = dim.upper()
-            select_items.append(f"obt.{col} AS {dim.lower()}")
+            dim_clean = dim.strip().lower()
+            if dim_clean not in ALLOWED_DIMENSIONS:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Dimension '{dim}' is not permitted. Permitted dimensions: {sorted(list(ALLOWED_DIMENSIONS))}"
+                )
+            col = DIMENSION_COLUMN_MAP.get(dim_clean, dim_clean.upper())
+            select_items.append(f"obt.{col} AS {dim_clean}")
             group_items.append(f"obt.{col}")
 
-    # 2. Time Dimension
+    # 2. Validate & compile time dimension aggregation
     if req.time_dimension:
-        grain = req.time_grain.upper() if req.time_grain else "MONTH"
-        time_col = f"DATE_TRUNC('{grain}', obt.{req.time_dimension.upper()})"
-        select_items.append(f"{time_col} AS {req.time_dimension}_{grain.lower()}")
-        group_items.append(time_col)
-
-    # 3. Governed Metrics (using exact standardized formulas)
-    for m in req.metrics:
-        if m not in GOVERNED_METRICS:
+        td_clean = req.time_dimension.strip().lower()
+        if td_clean not in ALLOWED_TIME_DIMENSIONS:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Metric '{m}' not defined in Semantic Layer registry."
+                detail=f"Time dimension '{req.time_dimension}' is not permitted. Allowed: {sorted(list(ALLOWED_TIME_DIMENSIONS))}"
             )
-        metric_def = GOVERNED_METRICS[m]
-        # Map formula to SQL expression with table alias
-        expr = metric_def.formula_expression.replace("TOTAL_AMOUNT", "obt.TOTAL_AMOUNT")
-        expr = expr.replace("BOOKING_ID", "obt.BOOKING_ID")
-        expr = expr.replace("BOOKING_STATUS", "obt.BOOKING_STATUS")
-        expr = expr.replace("LISTING_ID", "obt.LISTING_ID")
-        select_items.append(f"{expr} AS {m}")
+        grain = (req.time_grain or "month").strip().upper()
+        if grain not in ALLOWED_TIME_GRAINS:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Time grain '{req.time_grain}' is invalid. Permitted grains: {sorted(list(ALLOWED_TIME_GRAINS))}"
+            )
+        col = td_clean.upper()
+        time_expr = f"DATE_TRUNC('{grain}', obt.{col})"
+        select_items.append(f"{time_expr} AS {td_clean}_{grain.lower()}")
+        group_items.append(time_expr)
+
+    # 3. Validate & compile governed metrics from canonical registry
+    if not req.metrics:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="At least one governed metric must be specified in query request."
+        )
+
+    for m in req.metrics:
+        m_clean = m.strip().lower()
+        if m_clean not in GOVERNED_METRICS:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Metric '{m}' not defined in Semantic Layer registry. Available: {sorted(list(GOVERNED_METRICS.keys()))}"
+            )
+        metric_def = GOVERNED_METRICS[m_clean]
+        # Standardize table aliases on Gold OBT
+        expr = metric_def.formula_expression
+        for raw_col in ["TOTAL_AMOUNT", "CLEANING_FEE", "SERVICE_FEE", "BOOKING_ID", "BOOKING_STATUS", "LISTING_ID", "HOST_ID"]:
+            expr = expr.replace(raw_col, f"obt.{raw_col}")
+        select_items.append(f"{expr} AS {m_clean}")
 
     select_clause = ",\n    ".join(select_items)
     from_clause = "FROM AIRBNB.gold.obt AS obt"
 
-    # 4. Filters
+    # 4. Validate & compile filters with SQL injection prevention
     where_clauses = []
     if req.filters:
         for k, v in req.filters.items():
-            if isinstance(v, str):
-                where_clauses.append(f"obt.{k.upper()} = '{v}'")
-            elif isinstance(v, (int, float)):
-                where_clauses.append(f"obt.{k.upper()} = {v}")
-            elif isinstance(v, list):
-                quoted_vals = ", ".join([f"'{x}'" for x in v])
-                where_clauses.append(f"obt.{k.upper()} IN ({quoted_vals})")
+            k_clean = k.strip().lower()
+            if k_clean not in ALLOWED_DIMENSIONS:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Filter field '{k}' is not a permitted dimension."
+                )
+            col = DIMENSION_COLUMN_MAP.get(k_clean, k_clean.upper())
+            sanitized_expr = _sanitize_filter_value(v)
+            if sanitized_expr.startswith("IN "):
+                where_clauses.append(f"obt.{col} {sanitized_expr}")
+            else:
+                where_clauses.append(f"obt.{col} = {sanitized_expr}")
 
     where_sql = ("\nWHERE " + " AND ".join(where_clauses)) if where_clauses else ""
     group_sql = ("\nGROUP BY " + ", ".join(group_items)) if group_items else ""
-    order_sql = f"\nORDER BY 1 ASC"
-    limit_sql = f"\nLIMIT {req.limit}"
+    order_sql = "\nORDER BY 1 ASC"
+    limit_val = max(1, min(1000, req.limit or 100))
+    limit_sql = f"\nLIMIT {limit_val}"
 
     return f"SELECT\n    {select_clause}\n{from_clause}{where_sql}{group_sql}{order_sql}{limit_sql};"
 

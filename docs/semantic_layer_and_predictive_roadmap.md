@@ -38,7 +38,7 @@ Snowflake Gold Marts ──► dbt / MetricFlow (Semantic Layer)
 
 ## 📐 2.0 Semantic Layer & Metrics as Code Implementation
 
-The Semantic Layer is defined directly in version control at [`models/gold/semantic_models.yml`](file:///Users/jimitnaik/Documents/Projects/Airbnb%20Snowflake%20DBT%20Pipeline/airbnb_snowflake_dbt_pipeline/models/gold/semantic_models.yml).
+The Semantic Layer is defined directly in version control at [`models/gold/semantic_models.yml`](../airbnb_snowflake_dbt_pipeline/models/gold/semantic_models.yml).
 
 ### 2.1 Entities, Dimensions, and Measures
 * **Entities**:
@@ -87,7 +87,7 @@ Provides a RESTful API layer that translates high-level metric requests into gov
     "filters": {"country": "USA"}
   }
   ```
-* **Postman Collection**: Readily available at [`semantic_api/airbnb_semantic_layer_postman_collection.json`](file:///Users/jimitnaik/Documents/Projects/Airbnb%20Snowflake%20DBT%20Pipeline/semantic_api/airbnb_semantic_layer_postman_collection.json).
+* **Postman Collection**: Readily available at [`semantic_api/airbnb_semantic_layer_postman_collection.json`](../semantic_api/airbnb_semantic_layer_postman_collection.json).
 
 ### 3.2 Streamlit Python Data App (`apps/semantic_bi_app.py`)
 An interactive executive and operational application with four dedicated workspaces:

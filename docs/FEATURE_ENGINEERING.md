@@ -38,7 +38,7 @@ The predictive subsystem bridges historical Snowflake Gold Marts (`AIRBNB.gold.o
 ```
 
 ### Core Design Guarantees
-1. **Strict Train-Serve Parity**: All feature transformations are encapsulated in custom, serializable scikit-learn transformers (`AirbnbFeatureEngineer` in [`ml/features/transformers.py`](file:///Users/jimitnaik/Documents/Projects/Airbnb%20Snowflake%20DBT%20Pipeline/ml/features/transformers.py)) embedded directly into the persisted model pipeline. Both offline model training and real-time FastAPI endpoints (`/predict/price`, `/predict/cancellation`) execute identical code paths.
+1. **Strict Train-Serve Parity**: All feature transformations are encapsulated in custom, serializable scikit-learn transformers (`AirbnbFeatureEngineer` in [`ml/features/transformers.py`](../ml/features/transformers.py)) embedded directly into the persisted model pipeline. Both offline model training and real-time FastAPI endpoints (`/predict/price`, `/predict/cancellation`) execute identical code paths.
 2. **Zero Lookahead Leakage**: Temporal features and sliding-window aggregations strictly exclude observations occurring at or after the prediction timestamp (`t < curr_time`).
 3. **Defensive Typing & Zero Div/0 Crashes**: Financial ratios and capacity metrics implement strict mathematical guards (masking non-positive totals, clipping ratios to `[0.0, 1.0]`, and tracking invalid data indicators).
 
@@ -114,7 +114,7 @@ Encodes host responsiveness and verified Superhost badges.
 ---
 
 ### 2.6 Zipline Point-in-Time Sliding Window Features
-Implemented in [`ml/features/feature_store.py`](file:///Users/jimitnaik/Documents/Projects/Airbnb%20Snowflake%20DBT%20Pipeline/ml/features/feature_store.py), these features simulate an enterprise point-in-time feature store (Zipline pattern), computing listing behavioral velocity prior to reservation timestamp:
+Implemented in [`ml/features/feature_store.py`](../ml/features/feature_store.py), these features simulate an enterprise point-in-time feature store (Zipline pattern), computing listing behavioral velocity prior to reservation timestamp:
 
 ```text
 Window(t) = [t - 30 days, t)    (strictly prior to current observation timestamp)
@@ -152,7 +152,7 @@ The preprocessor is structured as a `ColumnTransformer` executing distinct sciki
 
 ## 4. Verification & Unit Testing
 
-The feature engineering subsystem is thoroughly verified via continuous automated unit tests in [`ml/tests/test_ml_pipeline.py`](file:///Users/jimitnaik/Documents/Projects/Airbnb%20Snowflake%20DBT%20Pipeline/ml/tests/test_ml_pipeline.py):
+The feature engineering subsystem is thoroughly verified via continuous automated unit tests in [`ml/tests/test_ml_pipeline.py`](../ml/tests/test_ml_pipeline.py):
 
 * `test_feature_engineer_transformation`: Verifies shape, non-null guarantees, and trigonometric ranges `[-1.0, 1.0]`.
 * `test_lead_time_edge_cases`: Verifies sub-day truncation protections, negative retroactive booking flags, and missing date coercion.

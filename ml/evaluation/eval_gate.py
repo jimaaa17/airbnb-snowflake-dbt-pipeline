@@ -25,6 +25,8 @@ from ml.tracking.tracker import MLflowTracker, get_default_tracking_uri
 MIN_PRICE_R2 = 0.85
 MAX_PRICE_MAPE = 0.20  # 20% max error
 MIN_CLASSIFIER_ACCURACY = 0.60
+MIN_CLASSIFIER_PR_AUC = 0.25  # Must demonstrate positive precision-recall lift over naive prior
+MIN_CLASSIFIER_RECALL = 0.10  # Must catch >=10% of cancellations to justify intervention workflows
 MIN_PRICING_GUARDRAIL_PCT = 0.50  # At least 50% within fair guardrails
 
 def run_evaluation_gate():
@@ -76,8 +78,11 @@ def run_evaluation_gate():
         logger.info("Evaluating Cancellation Classifier from local binary fallback: ml/artifacts/cancellation_model.joblib")
 
     cancel_metrics = cancel_model.evaluate(test_df)
-    logger.info("Cancellation Classifier Quality: Accuracy=%.4f (Min SLA=%.2f)",
-                cancel_metrics["accuracy"], MIN_CLASSIFIER_ACCURACY)
+    logger.info("Cancellation Classifier Quality: Accuracy=%.4f (Min SLA=%.2f) | PR-AUC=%.4f (Min SLA=%.2f) | Recall=%.2f%% | Brier=%.4f",
+                cancel_metrics["accuracy"], MIN_CLASSIFIER_ACCURACY,
+                cancel_metrics["pr_auc"], MIN_CLASSIFIER_PR_AUC,
+                cancel_metrics["recall"] * 100,
+                cancel_metrics.get("brier_score", 0.0))
     logger.info("SME Cancellation Impact: Revenue Protected=$%.2f (%.1f%% capture) | Salvaged Yield=$%.2f",
                 cancel_metrics.get("sme_revenue_protected_usd", 0.0),
                 cancel_metrics.get("sme_protection_capture_rate", 0.0) * 100,
@@ -85,6 +90,10 @@ def run_evaluation_gate():
 
     if cancel_metrics["accuracy"] < MIN_CLASSIFIER_ACCURACY:
         logger.error("GATE REJECTED: Cancellation accuracy (%.4f) below SLA threshold (%.2f)", cancel_metrics["accuracy"], MIN_CLASSIFIER_ACCURACY)
+        sys.exit(1)
+
+    if cancel_metrics["pr_auc"] < MIN_CLASSIFIER_PR_AUC:
+        logger.error("GATE REJECTED: Cancellation PR-AUC (%.4f) below SLA threshold (%.2f)", cancel_metrics["pr_auc"], MIN_CLASSIFIER_PR_AUC)
         sys.exit(1)
 
     logger.info("ALL MODEL QUALITY & SME GATES PASSED! Validated for production deployment.")

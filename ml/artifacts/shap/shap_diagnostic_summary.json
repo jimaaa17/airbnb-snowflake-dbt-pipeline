@@ -1,44 +1,44 @@
 {
   "total_test_samples": 300,
-  "underpriced_count": 58,
-  "underpriced_pct": 0.1933,
-  "avg_underpriced_gap_usd": 33.23,
-  "expected_value_base_price": 254.76,
+  "underpriced_count": 60,
+  "underpriced_pct": 0.2,
+  "avg_underpriced_gap_usd": 33.28,
+  "expected_value_base_price": 250.94,
   "global_top_drivers": {
-    "num__ACCOMMODATES": 67.0100314558575,
-    "cat__ROOM_TYPE_Entire home": 16.582173292553865,
-    "cat__CITY_Berlin": 15.510075633521495,
-    "cat__ROOM_TYPE_Private room": 12.941028423283832,
-    "cat__CITY_San Francisco": 11.975320534439664,
-    "num__BATHROOMS": 7.670804727966618,
-    "cat__CITY_New York": 7.577695335885454,
-    "cat__CITY_Tokyo": 6.275711479748492,
-    "cat__CITY_London": 4.363652816776974,
-    "num__bedroom_to_accommodates_ratio": 4.171005343129811
+    "num__ACCOMMODATES": 65.99972411916505,
+    "cat__CITY_Berlin": 20.291968793666236,
+    "cat__ROOM_TYPE_Entire home": 15.478508155024784,
+    "cat__ROOM_TYPE_Private room": 14.032575333248575,
+    "cat__CITY_San Francisco": 12.675398542154035,
+    "num__BATHROOMS": 8.14458053138476,
+    "cat__CITY_Tokyo": 5.786442599846321,
+    "cat__CITY_New York": 5.311495134322718,
+    "num__BEDROOMS": 4.572435389699997,
+    "num__bedroom_to_accommodates_ratio": 4.55173689190923
   },
   "underpriced_positive_drivers": {
-    "cat__CITY_Tokyo": 0.7721879355207842,
-    "num__host_response_rate": 0.72209047329661,
-    "num__bedroom_to_accommodates_ratio": 0.6372102484764048,
-    "num__arrival_month_sin": 0.4867892689401822,
-    "num__arrival_month_cos": 0.23187280672466623,
-    "num__arrival_month": 0.2263935301024702,
-    "num__arrival_dow_sin": 0.10491874136942964,
-    "cat__PROPERTY_TYPE_Apartment": 0.08027866333668217,
-    "num__arrival_dow": 0.048319332592282646,
-    "num__CLEANING_FEE": 0.03661512962931873
+    "num__CLEANING_FEE": 0.3887644028497827,
+    "num__bedroom_to_accommodates_ratio": 0.3621930324962573,
+    "cat__CITY_Paris": 0.32787318670281146,
+    "num__host_response_rate": 0.31916663510147475,
+    "num__cleaning_fee_per_bedroom": 0.2873861610608552,
+    "num__arrival_month_sin": 0.15987604854803586,
+    "cat__RESPONSE_RATE_BAND_AVERAGE": 0.12036249293403593,
+    "cat__CITY_Tokyo": 0.11443064346588883,
+    "num__arrival_dow_sin": 0.11175730393960005,
+    "cat__PROPERTY_TYPE_House": 0.10488369503478973
   },
   "underpriced_most_impactful": {
-    "num__ACCOMMODATES": 69.90285652128149,
-    "cat__CITY_Berlin": 19.317345901008093,
-    "cat__ROOM_TYPE_Entire home": 16.72847826368964,
-    "cat__ROOM_TYPE_Private room": 12.63982994734417,
-    "cat__CITY_San Francisco": 9.083790794353087,
-    "num__BATHROOMS": 6.891992999863895,
-    "cat__CITY_New York": 4.847918901173251,
-    "cat__CITY_Tokyo": 4.593802970399512,
-    "cat__CITY_London": 4.020734412966054,
-    "num__bedroom_to_accommodates_ratio": 3.9346558326680676
+    "num__ACCOMMODATES": 70.42516117060248,
+    "cat__CITY_Berlin": 19.43375951299767,
+    "cat__ROOM_TYPE_Entire home": 15.329386119807017,
+    "cat__ROOM_TYPE_Private room": 13.929235102407576,
+    "cat__CITY_San Francisco": 11.041376513849665,
+    "num__BATHROOMS": 8.904736294726064,
+    "cat__CITY_Tokyo": 6.060519281832072,
+    "num__BEDROOMS": 4.786553630977817,
+    "cat__CITY_New York": 4.631709008237821,
+    "num__bedroom_to_accommodates_ratio": 4.4774217959110825
   },
   "plots": {
     "global_importance": "ml/artifacts/shap/shap_global_importance.png",
@@ -46,75 +46,75 @@
   },
   "case_studies": [
     {
-      "test_index": 192,
-      "listing_id": "LST_0269",
-      "city": "Paris",
-      "room_type": "Private room",
-      "accommodates": 6,
-      "actual_price": 225.35,
-      "predicted_price": 304.5,
-      "underpriced_gap_usd": 79.15,
-      "top_positive_shap_drivers": {
-        "num__ACCOMMODATES": 75.78,
-        "cat__CITY_Berlin": 9.44,
-        "num__BATHROOMS": 9.22,
-        "cat__CITY_Tokyo": 5.09,
-        "num__host_response_rate": 1.34
-      },
-      "top_negative_shap_drivers": {
-        "cat__ROOM_TYPE_Entire home": -16.14,
-        "cat__ROOM_TYPE_Private room": -13.37,
-        "cat__CITY_San Francisco": -8.74,
-        "cat__CITY_New York": -6.68,
-        "cat__CITY_London": -5.0
-      }
-    },
-    {
-      "test_index": 258,
-      "listing_id": "LST_0140",
-      "city": "San Francisco",
-      "room_type": "Private room",
-      "accommodates": 1,
-      "actual_price": 46.21,
-      "predicted_price": 117.26,
-      "underpriced_gap_usd": 71.05,
-      "top_positive_shap_drivers": {
-        "cat__CITY_San Francisco": 24.88,
-        "cat__CITY_Berlin": 7.52,
-        "cat__CITY_Tokyo": 3.0,
-        "num__arrival_dow_sin": 1.1,
-        "cat__PROPERTY_TYPE_Apartment": 1.01
-      },
-      "top_negative_shap_drivers": {
-        "num__ACCOMMODATES": -112.96,
-        "cat__ROOM_TYPE_Entire home": -19.67,
-        "cat__ROOM_TYPE_Private room": -13.1,
-        "num__BATHROOMS": -9.57,
-        "num__BEDROOMS": -5.61
-      }
-    },
-    {
-      "test_index": 1,
-      "listing_id": "LST_0280",
+      "test_index": 25,
+      "listing_id": "LST_0195",
       "city": "London",
       "room_type": "Private room",
-      "accommodates": 3,
-      "actual_price": 131.53,
-      "predicted_price": 195.2,
-      "underpriced_gap_usd": 63.67,
+      "accommodates": 7,
+      "actual_price": 301.19,
+      "predicted_price": 392.51,
+      "underpriced_gap_usd": 91.32,
       "top_positive_shap_drivers": {
-        "cat__CITY_London": 9.82,
-        "cat__CITY_Berlin": 8.1,
-        "num__bedroom_to_accommodates_ratio": 7.81,
-        "cat__CITY_Tokyo": 3.94,
-        "num__BEDROOMS": 1.92
+        "num__ACCOMMODATES": 106.29,
+        "num__BATHROOMS": 13.59,
+        "cat__CITY_Berlin": 11.97,
+        "num__BEDROOMS": 10.06,
+        "num__bedroom_to_accommodates_ratio": 9.55
       },
       "top_negative_shap_drivers": {
-        "num__ACCOMMODATES": -52.87,
-        "cat__ROOM_TYPE_Entire home": -16.7,
-        "cat__ROOM_TYPE_Private room": -13.12,
-        "cat__CITY_San Francisco": -6.1,
-        "cat__CITY_New York": -3.38
+        "cat__ROOM_TYPE_Private room": -15.15,
+        "cat__ROOM_TYPE_Entire home": -14.53,
+        "cat__CITY_San Francisco": -10.73,
+        "cat__CITY_New York": -3.55,
+        "num__arrival_dow": -0.82
+      }
+    },
+    {
+      "test_index": 213,
+      "listing_id": "LST_0234",
+      "city": "San Francisco",
+      "room_type": "Entire home",
+      "accommodates": 3,
+      "actual_price": 229.07,
+      "predicted_price": 300.4,
+      "underpriced_gap_usd": 71.33,
+      "top_positive_shap_drivers": {
+        "cat__CITY_San Francisco": 36.49,
+        "cat__ROOM_TYPE_Private room": 18.66,
+        "cat__ROOM_TYPE_Entire home": 15.08,
+        "cat__CITY_Berlin": 13.79,
+        "num__cleaning_fee_per_accommodate": 6.64
+      },
+      "top_negative_shap_drivers": {
+        "num__ACCOMMODATES": -58.74,
+        "cat__CITY_New York": -2.32,
+        "cat__CITY_London": -1.24,
+        "num__CLEANING_FEE": -0.98,
+        "num__arrival_month": -0.88
+      }
+    },
+    {
+      "test_index": 46,
+      "listing_id": "LST_0287",
+      "city": "Tokyo",
+      "room_type": "Private room",
+      "accommodates": 5,
+      "actual_price": 183.81,
+      "predicted_price": 236.84,
+      "underpriced_gap_usd": 53.03,
+      "top_positive_shap_drivers": {
+        "num__ACCOMMODATES": 56.27,
+        "cat__CITY_Berlin": 8.17,
+        "num__cleaning_fee_per_accommodate": 2.32,
+        "cat__CITY_Paris": 1.55,
+        "num__host_response_rate": 1.29
+      },
+      "top_negative_shap_drivers": {
+        "cat__CITY_Tokyo": -21.58,
+        "cat__ROOM_TYPE_Entire home": -19.32,
+        "cat__ROOM_TYPE_Private room": -12.61,
+        "cat__CITY_San Francisco": -10.74,
+        "cat__CITY_New York": -4.03
       }
     }
   ]

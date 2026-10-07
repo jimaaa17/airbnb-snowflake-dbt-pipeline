@@ -20,7 +20,7 @@ def render():
         chosen_metrics = st.multiselect(
             "Select Governed Metrics:",
             options=list(SEMANTIC_METRICS.keys()),
-            default=["total_revenue", "booking_conversion_rate", "average_booking_value"],
+            default=["total_revenue", "booking_confirmation_rate", "average_booking_value"],
             format_func=lambda k: f"{SEMANTIC_METRICS[k]['label']} ({SEMANTIC_METRICS[k]['tier']})"
         )
     with col_d:
@@ -60,6 +60,7 @@ ORDER BY 1 ASC;"""
         lambda x: pd.Series({
             "total_revenue": round(x["TOTAL_AMOUNT"].sum(), 2),
             "total_bookings": len(x),
+            "booking_confirmation_rate": round((x["BOOKING_STATUS"] == "confirmed").mean() * 100, 2),
             "booking_conversion_rate": round((x["BOOKING_STATUS"] == "confirmed").mean() * 100, 2),
             "cancellation_rate": round((x["BOOKING_STATUS"] == "cancelled").mean() * 100, 2),
             "average_booking_value": round(x["TOTAL_AMOUNT"].mean(), 2),

@@ -29,7 +29,7 @@ def render():
         col1, col2 = st.columns(2)
         with col1:
             target_metric = st.selectbox("Select Target Metric to Investigate:", [
-                "Booking Conversion Rate (%)",
+                "Booking Confirmation Rate (%)",
                 "Total Revenue ($)",
                 "Average Booking Value ($)"
             ])
@@ -42,16 +42,16 @@ def render():
                 "IS_SUPERHOST"
             ])
 
-        if target_metric == "Booking Conversion Rate (%)":
+        if "Confirmation" in target_metric or "Conversion" in target_metric:
             decomp_df = df_obt.groupby(drill_dim).apply(
                 lambda x: pd.Series({
                     "Total Attempts": len(x),
                     "Confirmed Reservations": (x["BOOKING_STATUS"] == "confirmed").sum(),
                     "Cancelled Reservations": (x["BOOKING_STATUS"] == "cancelled").sum(),
-                    "Conversion Rate (%)": round((x["BOOKING_STATUS"] == "confirmed").mean() * 100, 2),
+                    "Confirmation Rate (%)": round((x["BOOKING_STATUS"] == "confirmed").mean() * 100, 2),
                     "Cancellation Rate (%)": round((x["BOOKING_STATUS"] == "cancelled").mean() * 100, 2)
                 })
-            ).reset_index().sort_values(by="Conversion Rate (%)", ascending=False)
+            ).reset_index().sort_values(by="Confirmation Rate (%)", ascending=False)
             st.dataframe(decomp_df, use_container_width=True)
         else:
             decomp_df = df_obt.groupby(drill_dim).agg(

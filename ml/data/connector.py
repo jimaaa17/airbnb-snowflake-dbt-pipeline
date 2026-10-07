@@ -29,7 +29,7 @@ class SnowflakeConnector:
         self.account = account or os.getenv("SNOWFLAKE_ACCOUNT")
         self.user = user or os.getenv("SNOWFLAKE_USER")
         self.password = password or os.getenv("SNOWFLAKE_PASSWORD")
-        self.role = role or os.getenv("SNOWFLAKE_ROLE", "ACCOUNTADMIN")
+        self.role = role or os.getenv("SNOWFLAKE_ROLE", "AIRBNB_TRANSFORMER_ROLE")
         self.warehouse = warehouse or os.getenv("SNOWFLAKE_WAREHOUSE", "SNOWFLAKE_LEARNING_WH")
         self.database = database or os.getenv("SNOWFLAKE_DATABASE", "AIRBNB")
         self.schema = schema or os.getenv("SNOWFLAKE_SCHEMA", "gold")
@@ -115,6 +115,12 @@ class SnowflakeConnector:
             lead_time_days = (b_date - b_created_at).days
             cancel_prob = 0.15 + (0.10 if lead_time_days > 20 else 0.0) + (0.08 if price_tag == "HIGH" else 0.0) - (0.07 if is_superhost == "TRUE" else 0.0)
             status = "cancelled" if rng.uniform() < cancel_prob else "confirmed"
+            if status == "cancelled":
+                cancel_lead = max(1, lead_time_days)
+                cancel_offset = int(rng.integers(1, max(2, cancel_lead)))
+                cancelled_at = b_created_at + pd.Timedelta(days=cancel_offset)
+            else:
+                cancelled_at = pd.NaT
 
             rows.append({
                 "BOOKING_ID": f"BKG_{i:05d}",
@@ -124,6 +130,7 @@ class SnowflakeConnector:
                 "TOTAL_AMOUNT": total_amount,
                 "BOOKING_STATUS": status,
                 "BOOKING_CREATED_AT": b_created_at,
+                "CANCELLED_AT": cancelled_at,
                 "LISTING_ID": rng.choice(listing_ids),
                 "PROPERTY_TYPE": p_type,
                 "ROOM_TYPE": r_type,
