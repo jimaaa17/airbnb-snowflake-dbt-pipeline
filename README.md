@@ -18,9 +18,19 @@
 
 ---
 
-## 📌 Project Overview
+## 📌 Project Overview & Scope
 
-This platform is a production-grade data intelligence ecosystem for Airbnb marketplace analytics and predictive operations. It ingests raw event data from **AWS S3** into **Snowflake**, models transformations through a **dbt Medallion Architecture**, enforces enterprise metric consistency via the **dbt Semantic Layer (MetricFlow)**, automates **MLOps lifecycle tracking and model registry** with **MLflow**, and serves insights through **FastAPI microservices** and an interactive **Streamlit Analytics Studio**.
+This project is an end-to-end reference implementation and prototype demonstrating a modern data intelligence platform for Airbnb marketplace analytics and predictive operations. It demonstrates how to integrate raw cloud data warehousing (**Snowflake** + **dbt Medallion Architecture**), governed business metrics (**dbt MetricFlow Semantic Layer**), production ML pipelines with experiment tracking (**MLflow** + **scikit-learn**), model explainability (**SHAP**), and multimodal consumption (**FastAPI** + **Streamlit**).
+
+### 🎯 Implementation Status: Demonstrated vs. Production Extensions
+
+| Layer | Demonstrated in Repository (Live / POC) | Recommended Enterprise Production Extensions |
+| :--- | :--- | :--- |
+| **Data Warehouse** | Snowflake Medallion (`staging` → `bronze` → `silver` → `gold.obt`), SCD2 snapshots, 82 passing dbt tests. | Airflow / Dagster scheduled orchestration, automated S3 Snowpipe ingestion, Snowflake dynamic tables. |
+| **Semantic Layer** | dbt MetricFlow models in `semantic_models.yml` defining certified metrics (SSOT). | dbt Semantic Layer Cloud API / GraphQL server, Tableau / PowerBI semantic integrations. |
+| **MLOps & Tracking** | Local MLflow tracking backend (`sqlite:///ml/mlruns.db`), `@champion` Model Registry staging, automated CI SLA gates. | Centralized hosted MLflow tracking server (AWS ECS/Databricks), cloud artifact storage (S3/GCS), continuous data drift monitoring (Evidently AI). |
+| **Feature Store** | Python point-in-time sliding window engine (`feature_store.py`) enforcing zero lookahead bias with deterministic offline fallback. | Low-latency online feature store (Redis / Feast / Hopsworks) for sub-10ms real-time lookups. |
+| **Serving & UI** | Uvicorn FastAPI microservice (`:8000`), Dockerfile container spec, 5-page Streamlit Analytics Studio (`:8502`). | Kubernetes (EKS/GKE) or AWS ECS autoscaling clusters with API gateway rate-limiting and TLS termination. |
 
 ---
 
@@ -175,16 +185,18 @@ All raw transactional and listing fields are transformed through [`ml/features/t
 * **Point-in-Time Historical As-Of Features (Zipline)**:
   * `trailing_30d_listing_bookings`, `trailing_30d_listing_cancellations`, and `trailing_30d_cancellation_rate` computed strictly prior to observation timestamp (`t < curr_time`) with zero lookahead bias.
 
-### 2. Predictive Models & SME Impact Evaluation
+### 2. Predictive Models & Demonstrated Business Impact (Holdout Benchmark)
 
-| Model | Architecture | Technical Performance | SME Business Impact Metrics |
+The models were evaluated against a 20% chronological holdout test set (300 test transactions), translating mathematical performance into actionable business units:
+
+| Model | Architecture | Technical Performance | Demonstrated Business Impact (Benchmark Sample) |
 | :--- | :--- | :--- | :--- |
-| **Dynamic Price Regressor** | Gradient Boosting Regressor (`max_depth=5`, `n_estimators=150`) | **$R^2 = 0.9483$**<br/>**$\text{MAPE} = 10.34\%$**<br/>$\text{MAE} = \$20.54$ | • **Underpriced Listings**: 19.3% leaving money on the table<br/>• **Est. Monthly Uplift**: +$42.50 / listing<br/>• **Guardrail Compliance**: 72.0% within ±10% fair market rate |
-| **Cancellation Classifier** | Stratified Gradient Boosting Classifier (`threshold=0.35`) | **ROC-AUC = 0.8124**<br/>**PR-AUC = 0.7780**<br/>**$F_1 = 0.7412$** | • **Revenue at Risk**: $24,150 evaluated<br/>• **Revenue Protected**: $18,350 (76.0% capture)<br/>• **Avg. Warning Lead**: 34 days advance notice for host rebooking |
+| **Dynamic Price Regressor** | Gradient Boosting Regressor (`max_depth=5`, `n_estimators=150`) | **$R^2 = 0.9483$**<br/>**$\text{MAPE} = 10.34\%$**<br/>$\text{MAE} = \$20.54$ | • **Underpriced Listings**: 19.3% flagged as underpriced<br/>• **Est. Monthly Uplift**: +$42.50 / listing via fair-rate adjustment<br/>• **Guardrail Compliance**: 72.0% within ±10% fair market rate |
+| **Cancellation Classifier** | Stratified Gradient Boosting Classifier (`threshold=0.35`) | **ROC-AUC = 0.8124**<br/>**PR-AUC = 0.7780**<br/>**$F_1 = 0.7412$** | • **Revenue at Risk**: $24,150 evaluated across test cohort<br/>• **Revenue Protected**: $18,350 (76.0% capture via early alert)<br/>• **Avg. Warning Lead**: 34 days advance notice for host rebooking |
 
-### 3. MLflow Model Registry & Lifecycle Management
+### 3. MLflow Model Registry & Experiment Tracking
 * Centralized SQLite tracking backend (`sqlite:///ml/mlruns.db`) logging parameters, metrics, and pipeline artifacts.
-* Automated promotion to **MLflow Model Registry** with `@champion` alias tagging for zero-downtime serving.
+* Automated promotion to **MLflow Model Registry** with `@champion` alias tagging, allowing inference services to query the latest approved model version dynamically.
 
 ### 4. SHAP Interpretability & Explainability Diagnostics
 * **TreeExplainer Attribution**: Computes exact Shapley values for all pricing predictions in [`ml/evaluation/shap_diagnostics.py`](ml/evaluation/shap_diagnostics.py).
@@ -192,9 +204,9 @@ All raw transactional and listing fields are transformed through [`ml/features/t
 * **Underpriced Cohort Diagnosis**: Quantifies which features push fair market value *above* the host's listed rate, empowering hosts with actionable pricing recommendations.
 
 ### 5. Automated CI/CD Quality Gate (`eval_gate.py`)
-Retraining pipelines enforce automated quality gates before serializing artifacts or promoting registry models:
+Retraining pipelines enforce automated quality gates asserting that candidates exceed baseline thresholds before promotion:
 * Regression Gate: $R^2 \ge 0.85$ and $\text{MAPE} \le 20.0\%$
-* Classification Gate: Accuracy $\ge 60.0\%$ and ROC-AUC $\ge 0.70$
+* Classification Gate: Accuracy $\ge 60.0\%$ (matching [`MIN_CLASSIFIER_ACCURACY`](ml/evaluation/eval_gate.py))
 
 ---
 
@@ -295,50 +307,106 @@ This repository is built following enterprise standards for data engineering, ML
 
 ---
 
-## 🚀 Quickstart & Execution Commands
+## 🚀 Quickstart & Setup Guide
 
-### 1. Install Environment
+### 📋 Prerequisites
+
+| Prerequisite | Purpose | Required For |
+| :--- | :--- | :--- |
+| **Python 3.12+** | Core runtime | All workflows |
+| **Astral `uv`** | Deterministic virtualenv & package manager | All workflows (`curl -LsSf https://astral.sh/uv/install.sh \| sh`) |
+| **Snowflake Account** | Cloud Data Warehouse (30-day free trial or enterprise) | dbt pipeline & live model training |
+| **AWS S3 / Staging CSVs** | Raw ingestion source (`listings`, `bookings`, `hosts`) | Snowflake staging `COPY INTO` |
+
+---
+
+### ⚙️ Configuration & Credentials
+
+#### 1. Configure dbt Profile (`~/.dbt/profiles.yml`)
+For Snowflake data transformations, create `~/.dbt/profiles.yml`:
+
+```yaml
+airbnb_snowflake_dbt_pipeline:
+  target: dev
+  outputs:
+    dev:
+      type: snowflake
+      account: "<your_snowflake_account_identifier>"  # e.g., xy12345.us-east-1
+      user: "<your_username>"
+      password: "<your_password>"
+      role: "ACCOUNTADMIN"
+      warehouse: "SNOWFLAKE_LEARNING_WH"
+      database: "AIRBNB"
+      schema: "dbt_schema"
+      threads: 4
+```
+
+#### 2. Configure Environment Variables (`.env`)
+Create a `.env` file in the repository root for Python connectors:
+
 ```bash
+# Snowflake Credentials (for live connector and dbt CI)
+SNOWFLAKE_ACCOUNT="<your_account_identifier>"
+SNOWFLAKE_USER="<your_username>"
+SNOWFLAKE_PASSWORD="<your_password>"
+SNOWFLAKE_ROLE="ACCOUNTADMIN"
+SNOWFLAKE_WAREHOUSE="SNOWFLAKE_LEARNING_WH"
+SNOWFLAKE_DATABASE="AIRBNB"
+SNOWFLAKE_SCHEMA="gold"
+
+# Offline Execution Switch (1 = Local Mock Data, 0 = Live Snowflake)
+AIRBNB_ML_OFFLINE=1
+```
+
+---
+
+### 💻 Execution Modes
+
+#### Option A: Zero-Credential Local Reproduction (Instant, No Snowflake Required)
+The repository includes a deterministic synthetic data generator matching the exact schema of `AIRBNB.gold.obt`. You can test and inspect the full MLOps, API, and UI stack locally in under 60 seconds:
+
+```bash
+# 1. Install dependencies into virtualenv
 uv sync
 source .venv/bin/activate
-```
 
-### 2. Run dbt Pipeline (Snowflake)
-```bash
-cd airbnb_snowflake_dbt_pipeline
-dbt debug                                         # Verify Snowflake connection
-dbt build                                         # Run snapshots, models, and tests in DAG order
-cd ..
-```
+# 2. Train ML pipelines, register champion models in MLflow, and pass SLA gate
+uv run python ml/train_all.py
 
-### 3. Launch FastAPI Semantic Gateway
-```bash
+# 3. Generate SHAP global feature attributions & underpriced cohort plots
+uv run python ml/run_shap_analysis.py
+
+# 4. Launch MLflow Experiment Tracking & Model Registry UI
+uv run mlflow ui --backend-store-uri sqlite:///ml/mlruns.db --port 5001
+# View runs & registry: http://localhost:5001
+
+# 5. Launch FastAPI Semantic Gateway microservice
 uv run python -m uvicorn semantic_api.main:app --host 0.0.0.0 --port 8000 --reload
 # Access Interactive Swagger Docs: http://localhost:8000/docs
-```
 
-### 4. Train Predictive Machine Learning Models
-```bash
-uv run python ml/train_all.py
-# Runs Feature Store aggregations, model training, and passes eval_gate.py
-```
-
-### 5. Run SHAP Interpretability Analysis
-```bash
-uv run python ml/run_shap_analysis.py
-# Computes global feature attribution and underpriced cohort drivers
-```
-
-### 6. Launch MLflow Tracking & Model Registry UI
-```bash
-uv run mlflow ui --backend-store-uri sqlite:///ml/mlruns.db --port 5001
-# View experiment runs, metric comparisons, and @champion model registry
-```
-
-### 7. Launch Airbnb Analytics Studio (Streamlit)
-```bash
+# 6. Launch Airbnb Analytics Studio (Streamlit App)
 uv run streamlit run apps/semantic_bi_app.py
-# Access Web Application: http://localhost:8502
+# Access Interactive Web App: http://localhost:8502
+```
+
+#### Option B: Full Snowflake Cloud Data Pipeline
+If you have configured your Snowflake account and staged raw files in `AIRBNB.staging`:
+
+```bash
+# 1. Verify Snowflake Connection & Compile DAG
+cd airbnb_snowflake_dbt_pipeline
+dbt debug
+dbt compile
+
+# 2. Run Full Medallion Build (Snapshots, Incremental Models, and 82 Tests)
+dbt build
+cd ..
+
+# 3. Train ML Models Directly Against Snowflake Gold OBT
+AIRBNB_ML_OFFLINE=0 uv run python ml/train_all.py
+
+# 4. Launch Applications
+uv run streamlit run apps/semantic_bi_app.py
 ```
 
 ---
