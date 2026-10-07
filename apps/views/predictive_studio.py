@@ -15,65 +15,6 @@ from ml.inference.service import (
     PricePredictionRequest,
 )
 
-CASE_STUDY_PRESETS = {
-    "✨ Custom Listing Sandbox": {
-        "city": "Paris",
-        "room_type": "Entire home",
-        "prop_type": "Apartment",
-        "accommodates": 4,
-        "bedrooms": 2,
-        "bathrooms": 1.5,
-        "cleaning_fee": 65.0,
-        "actual_price": 240.0,
-        "response_rate": 95.0,
-        "superhost": "TRUE",
-        "checkin_season": "2024-06-15 (Peak Summer)",
-        "description": "Adjust sliders and options freely to explore real-time pricing and guardrail recommendations."
-    },
-    "Case Study #1: Paris High-Capacity Room (LST_0269) — Underpriced by $79.15": {
-        "city": "Paris",
-        "room_type": "Private room",
-        "prop_type": "Apartment",
-        "accommodates": 6,
-        "bedrooms": 2,
-        "bathrooms": 2.0,
-        "cleaning_fee": 65.0,
-        "actual_price": 225.35,
-        "response_rate": 95.0,
-        "superhost": "TRUE",
-        "checkin_season": "2024-06-15 (Peak Summer)",
-        "description": "Host listed a 6-guest private room in central Paris at only $225.35/night. The model values it at ~$300/night due to high capacity and prime Paris location, leaving $79.15/night on the table."
-    },
-    "Case Study #2: San Francisco Deep Budget Listing (LST_0140) — Underpriced by $71.05": {
-        "city": "San Francisco",
-        "room_type": "Private room",
-        "prop_type": "Apartment",
-        "accommodates": 1,
-        "bedrooms": 1,
-        "bathrooms": 1.0,
-        "cleaning_fee": 35.0,
-        "actual_price": 46.21,
-        "response_rate": 90.0,
-        "superhost": "FALSE",
-        "checkin_season": "2024-06-15 (Peak Summer)",
-        "description": "Host offered a room in San Francisco at $46.21/night. City location demand floor and weekend check-in pushed fair value to ~$117/night, flagging an extreme $71.05/night underpricing."
-    },
-    "Case Study #3: London Multi-Guest Room (LST_0280) — Underpriced by $63.67": {
-        "city": "London",
-        "room_type": "Private room",
-        "prop_type": "Apartment",
-        "accommodates": 3,
-        "bedrooms": 2,
-        "bathrooms": 1.5,
-        "cleaning_fee": 50.0,
-        "actual_price": 131.53,
-        "response_rate": 95.0,
-        "superhost": "TRUE",
-        "checkin_season": "2024-06-15 (Peak Summer)",
-        "description": "Host listed for 3 guests at $131.53 in central London. Favorable bedroom-to-capacity ratio and London baseline demand valued it at ~$195/night, leaving $63.67/night uncaptured."
-    }
-}
-
 
 @st.cache_resource(show_spinner="Loading trained ML models & feature pipelines...")
 def load_inference_service(c_path: str, p_path: str) -> ModelInferenceService:
@@ -116,32 +57,21 @@ def render():
     # 1. DYNAMIC PRICING & YIELD GUARDRAILS TAB
     # =========================================================================
     with tab_pricing:
-        st.markdown('<p class="section-header">Interactive Pricing Discrepancy & Root Cause Explorer</p>', unsafe_allow_html=True)
-        st.caption("Inspect how changing physical attributes, seasonality, and location dynamically shifts fair market value and reveals money left on the table.")
-
-        # Preset Selector
-        preset_names = list(CASE_STUDY_PRESETS.keys())
-        selected_preset = st.selectbox(
-            "🎯 Load Pre-Diagnosed Case Study or Custom Sandbox:",
-            preset_names,
-            index=1,  # Default to Case Study #1 for instant demonstration
-            key="pricing_preset_selector"
-        )
-        preset = CASE_STUDY_PRESETS[selected_preset]
-        st.info(f"📌 **Case Study Overview:** {preset['description']}")
+        st.markdown('<p class="section-header">Live Dynamic Pricing & Yield Guardrail Simulator</p>', unsafe_allow_html=True)
+        st.caption("Adjust listing attributes, capacity, seasonality, and host pricing to evaluate real-time fair market value, guardrails, and revenue gap.")
 
         # Form Controls layout
         p_col1, p_col2 = st.columns(2)
         with p_col1:
             st.markdown("##### 📍 Location, Space & Timing")
             city_options = ["Paris", "San Francisco", "London", "Berlin", "New York", "Tokyo"]
-            p_city = st.selectbox("Target Market (City):", city_options, index=city_options.index(preset["city"]) if preset["city"] in city_options else 0, key="pr_city")
+            p_city = st.selectbox("Target Market (City):", city_options, index=0, key="pr_city")
             
             room_options = ["Entire home", "Private room"]
-            p_room = st.selectbox("Room Category:", room_options, index=room_options.index(preset["room_type"]), key="pr_room")
+            p_room = st.selectbox("Room Category:", room_options, index=0, key="pr_room")
             
             prop_options = ["Apartment", "Condo", "House"]
-            p_prop = st.selectbox("Property Type:", prop_options, index=prop_options.index(preset["prop_type"]), key="pr_prop")
+            p_prop = st.selectbox("Property Type:", prop_options, index=0, key="pr_prop")
             
             season_options = [
                 "2024-06-15 (Peak Summer / Month 6)",
@@ -149,21 +79,20 @@ def render():
                 "2024-01-15 (Off-Peak Winter / Month 1)",
                 "2024-10-15 (Autumn Shoulder / Month 10)"
             ]
-            default_season_idx = 0 if "June" in preset["checkin_season"] else 1
-            p_season = st.selectbox("Check-in Date & Seasonality:", season_options, index=default_season_idx, key="pr_season")
+            p_season = st.selectbox("Check-in Date & Seasonality:", season_options, index=0, key="pr_season")
             booking_date_val = p_season.split(" ")[0]
 
             sh_options = ["TRUE", "FALSE"]
-            p_superhost = st.selectbox("Host Superhost Tier:", sh_options, index=sh_options.index(preset["superhost"]), key="pr_sh")
+            p_superhost = st.selectbox("Host Superhost Tier:", sh_options, index=0, key="pr_sh")
 
         with p_col2:
             st.markdown("##### 📐 Capacity & Host Pricing")
-            p_acc = st.slider("Guest Capacity (Accommodates):", min_value=1, max_value=10, value=preset["accommodates"], key="pr_acc")
-            p_bed = st.slider("Bedrooms:", min_value=1, max_value=6, value=preset["bedrooms"], key="pr_bed")
-            p_bath = st.slider("Bathrooms:", min_value=1.0, max_value=4.0, value=preset["bathrooms"], step=0.5, key="pr_bath")
-            p_clean = st.slider("Cleaning Fee ($):", min_value=15.0, max_value=150.0, value=preset["cleaning_fee"], step=5.0, key="pr_clean")
-            p_actual = st.number_input("Host Actual Listed Price ($/night):", min_value=20.0, max_value=800.0, value=preset["actual_price"], step=5.0, key="pr_actual")
-            p_resp = st.slider("Host Responsiveness (%):", min_value=50.0, max_value=100.0, value=preset["response_rate"], step=5.0, key="pr_resp")
+            p_acc = st.slider("Guest Capacity (Accommodates):", min_value=1, max_value=10, value=4, key="pr_acc")
+            p_bed = st.slider("Bedrooms:", min_value=1, max_value=6, value=2, key="pr_bed")
+            p_bath = st.slider("Bathrooms:", min_value=1.0, max_value=4.0, value=1.5, step=0.5, key="pr_bath")
+            p_clean = st.slider("Cleaning Fee ($):", min_value=15.0, max_value=150.0, value=65.0, step=5.0, key="pr_clean")
+            p_actual = st.number_input("Host Actual Listed Price ($/night):", min_value=20.0, max_value=800.0, value=240.0, step=5.0, key="pr_actual")
+            p_resp = st.slider("Host Responsiveness (%):", min_value=30.0, max_value=100.0, value=95.0, step=5.0, key="pr_resp")
 
         # Execute Live Inference & SHAP Explanation
         p_req = PricePredictionRequest(

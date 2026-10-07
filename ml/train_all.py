@@ -10,6 +10,14 @@ from ml.data.datasets import load_gold_obt_dataset, temporal_train_test_split
 from ml.models.cancellation_classifier import CancellationClassifier
 from ml.models.price_regressor import PriceRegressor
 from ml.tracking.tracker import MLflowTracker
+from ml.evaluation.eval_gate import (
+    MIN_PRICE_R2,
+    MAX_PRICE_MAPE,
+    MIN_PRICING_GUARDRAIL_PCT,
+    MIN_CLASSIFIER_ACCURACY,
+    MIN_CLASSIFIER_PR_AUC,
+    MIN_CLASSIFIER_RECALL
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -53,7 +61,24 @@ def train_and_evaluate_all():
     cancel_model_path = os.path.join(artifacts_dir, "cancellation_model.joblib")
     cancel_model.save(cancel_model_path)
 
-    # Register in MLflow Model Registry and tag with '@champion' alias
+    # Evaluate candidate model against quality SLA gates before promotion to '@champion'
+    c_passes_gate = (
+        test_metrics_c["accuracy"] >= MIN_CLASSIFIER_ACCURACY and
+        test_metrics_c["pr_auc"] >= MIN_CLASSIFIER_PR_AUC and
+        test_metrics_c.get("recall", 0.0) >= MIN_CLASSIFIER_RECALL
+    )
+    c_alias = "champion" if c_passes_gate else "candidate"
+    c_status = "champion_promoted" if c_passes_gate else "quality_gate_failed"
+    if not c_passes_gate:
+        logger.warning(
+            "Cancellation Classifier did NOT pass quality SLA gates (Acc>=%.2f, PR-AUC>=%.2f, Recall>=%.2f). "
+            "Registered as candidate without '@champion' promotion.",
+            MIN_CLASSIFIER_ACCURACY, MIN_CLASSIFIER_PR_AUC, MIN_CLASSIFIER_RECALL
+        )
+    else:
+        logger.info("Cancellation Classifier candidate passed all SLA gates. Promoting to '@champion'.")
+
+    # Register in MLflow Model Registry
     c_reg = tracker.log_and_register_model(
         run_name="cancellation_classifier_v1",
         model_name="cancellation_classifier",
@@ -63,9 +88,10 @@ def train_and_evaluate_all():
         tags={
             "model_type": "gradient_boosting_classifier",
             "business_domain": "cancellation_prevention",
-            "sme_goal": "protect_host_revenue"
+            "sme_goal": "protect_host_revenue",
+            "promotion_status": c_status
         },
-        alias="champion"
+        alias=c_alias
     )
     logger.info("Cancellation Classifier registered in MLflow: %s (v%s, @%s)",
                 c_reg["model_name"], c_reg["version"], c_reg["alias"])
@@ -87,7 +113,24 @@ def train_and_evaluate_all():
     price_model_path = os.path.join(artifacts_dir, "price_regressor.joblib")
     price_model.save(price_model_path)
 
-    # Register in MLflow Model Registry and tag with '@champion' alias
+    # Evaluate candidate model against quality SLA gates before promotion to '@champion'
+    p_passes_gate = (
+        test_metrics_p["r2_score"] >= MIN_PRICE_R2 and
+        test_metrics_p["mape"] <= MAX_PRICE_MAPE and
+        test_metrics_p.get("sme_within_guardrails_pct", 0.0) >= MIN_PRICING_GUARDRAIL_PCT
+    )
+    p_alias = "champion" if p_passes_gate else "candidate"
+    p_status = "champion_promoted" if p_passes_gate else "quality_gate_failed"
+    if not p_passes_gate:
+        logger.warning(
+            "Price Regressor did NOT pass quality SLA gates (R2>=%.2f, MAPE<=%.2f, Guardrails>=%.2f). "
+            "Registered as candidate without '@champion' promotion.",
+            MIN_PRICE_R2, MAX_PRICE_MAPE, MIN_PRICING_GUARDRAIL_PCT
+        )
+    else:
+        logger.info("Price Regressor candidate passed all SLA gates. Promoting to '@champion'.")
+
+    # Register in MLflow Model Registry
     p_reg = tracker.log_and_register_model(
         run_name="price_regressor_v1",
         model_name="price_regressor",
@@ -97,9 +140,10 @@ def train_and_evaluate_all():
         tags={
             "model_type": "gradient_boosting_regressor",
             "business_domain": "pricing_optimization",
-            "sme_goal": "maximize_host_occupancy_and_yield"
+            "sme_goal": "maximize_host_occupancy_and_yield",
+            "promotion_status": p_status
         },
-        alias="champion"
+        alias=p_alias
     )
     logger.info("Price Regressor registered in MLflow: %s (v%s, @%s)",
                 p_reg["model_name"], p_reg["version"], p_reg["alias"])

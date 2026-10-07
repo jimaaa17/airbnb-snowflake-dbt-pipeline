@@ -105,3 +105,14 @@ def get_model_artifact_status():
     c_path = "ml/artifacts/cancellation_model.joblib"
     p_path = "ml/artifacts/price_regressor.joblib"
     return os.path.exists(c_path) and os.path.exists(p_path), c_path, p_path
+
+
+@st.cache_data(show_spinner="Querying active listings from Snowflake Gold...")
+def load_gold_listings() -> pd.DataFrame:
+    """Queries distinct active listings and attributes from Snowflake Gold Mart (AIRBNB.gold.obt)."""
+    from ml.data.connector import SnowflakeConnector
+    connector = SnowflakeConnector()
+    df_obt = connector.fetch_gold_obt()
+    listings = df_obt.groupby("LISTING_ID").first().reset_index()
+    return listings.sort_values("LISTING_ID").reset_index(drop=True)
+

@@ -131,7 +131,8 @@ class ModelInferenceService:
             "IS_SUPERHOST": req.is_superhost,
             "RESPONSE_RATE": req.response_rate,
             "RESPONSE_RATE_BAND": req.response_rate_band,
-            "BOOKING_STATUS": "confirmed"  # placeholder for feature store computation
+            "BOOKING_STATUS": "confirmed",  # placeholder for feature store computation
+            "CANCELLED_AT": pd.NaT
         }
         df = pd.DataFrame([row])
         prob = float(self.cancellation_model.predict_proba(df)[0])

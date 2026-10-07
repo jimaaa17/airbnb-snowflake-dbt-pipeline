@@ -27,15 +27,24 @@ class ZiplineFeatureStore:
         trailing_bookings = np.zeros(n_rows, dtype=int)
         trailing_cancellations = np.zeros(n_rows, dtype=int)
         
-        # Window calculation: strictly prior to current BOOKING_CREATED_AT
-        # Enforces point-in-time outcome availability when CANCELLED_AT is present
-        has_cancel_ts = "CANCELLED_AT" in sorted_df.columns and sorted_df["CANCELLED_AT"].notna().any()
+        if "CANCELLED_AT" not in sorted_df.columns:
+            raise ValueError(
+                "Missing required column 'CANCELLED_AT'. Point-in-time cancellation history requires "
+                "explicit outcome event timestamps to prevent future-informed target leakage. "
+                "Falling back to terminal 'BOOKING_STATUS' is strictly prohibited."
+            )
+
+        cancelled_missing_ts = (sorted_df["BOOKING_STATUS"] == "cancelled") & (sorted_df["CANCELLED_AT"].isna())
+        if cancelled_missing_ts.any():
+            raise ValueError(
+                f"Detected {cancelled_missing_ts.sum()} cancelled reservations missing explicit 'CANCELLED_AT' event timestamps. "
+                "All cancellation outcomes must provide occurrence timestamps for leakage-free point-in-time computation."
+            )
 
         for listing_id, group in sorted_df.groupby("LISTING_ID"):
             idxs = group.index.to_numpy()
             timestamps = group["BOOKING_CREATED_AT"].to_numpy()
-            is_cancel = (group["BOOKING_STATUS"] == "cancelled").to_numpy().astype(int)
-            cancel_ts_arr = pd.to_datetime(group["CANCELLED_AT"]).to_numpy() if has_cancel_ts else None
+            cancel_ts_arr = pd.to_datetime(group["CANCELLED_AT"]).to_numpy()
 
             for i, curr_idx in enumerate(idxs):
                 curr_time = timestamps[i]
@@ -45,19 +54,16 @@ class ZiplineFeatureStore:
                 mask = (timestamps[:i] >= window_start) & (timestamps[:i] < curr_time)
                 trailing_bookings[curr_idx] = int(np.sum(mask))
 
-                if has_cancel_ts:
-                    # Point-in-time outcome availability guarantee:
-                    # A prior booking's cancellation is ONLY observable at curr_time if the cancellation
-                    # event actually occurred strictly prior to curr_time (cancel_ts < curr_time)
-                    # and within the lookback window (cancel_ts >= window_start).
-                    cancel_mask = (
-                        (~pd.isna(cancel_ts_arr[:i])) &
-                        (cancel_ts_arr[:i] < curr_time) &
-                        (cancel_ts_arr[:i] >= window_start)
-                    )
-                    trailing_cancellations[curr_idx] = int(np.sum(cancel_mask))
-                else:
-                    trailing_cancellations[curr_idx] = int(np.sum(is_cancel[:i][mask]))
+                # Point-in-time outcome availability guarantee:
+                # A prior booking's cancellation is ONLY observable at curr_time if the cancellation
+                # event actually occurred strictly prior to curr_time (cancel_ts < curr_time)
+                # and within the lookback window (cancel_ts >= window_start).
+                cancel_mask = (
+                    (~pd.isna(cancel_ts_arr[:i])) &
+                    (cancel_ts_arr[:i] < curr_time) &
+                    (cancel_ts_arr[:i] >= window_start)
+                )
+                trailing_cancellations[curr_idx] = int(np.sum(cancel_mask))
 
         sorted_df["trailing_30d_listing_bookings"] = trailing_bookings
         sorted_df["trailing_30d_listing_cancellations"] = trailing_cancellations

@@ -24,6 +24,7 @@ dependencies = [
     "pyyaml>=6.0.3",
     "mlflow>=3.16.1",
     "shap>=0.52.0",
+    "httpx>=0.28.1",
 ]   
 
 [tool.uv]
@@ -31,3 +32,4 @@ package = false
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+testpaths = ["ml/tests", "semantic_api/tests"]

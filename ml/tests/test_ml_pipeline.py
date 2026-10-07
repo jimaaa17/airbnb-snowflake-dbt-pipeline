@@ -166,7 +166,7 @@ def test_calendar_seasonality_features_edge_cases():
 
 def test_zipline_feature_store_no_lookahead():
     """Verify Zipline point-in-time window feature does not look into the future."""
-    # Synthetic 3 events for same listing
+    # Synthetic 3 events for same listing with explicit outcome availability timestamps
     data = {
         "LISTING_ID": ["L1", "L1", "L1"],
         "BOOKING_CREATED_AT": [
@@ -174,7 +174,12 @@ def test_zipline_feature_store_no_lookahead():
             pd.Timestamp("2024-01-10"),
             pd.Timestamp("2024-01-20")
         ],
-        "BOOKING_STATUS": ["cancelled", "confirmed", "confirmed"]
+        "BOOKING_STATUS": ["cancelled", "confirmed", "confirmed"],
+        "CANCELLED_AT": [
+            pd.Timestamp("2024-01-05"),  # Cancel occurred before event 1 and 2
+            pd.NaT,
+            pd.NaT
+        ]
     }
     df = pd.DataFrame(data)
     store = ZiplineFeatureStore(window_days=30)
@@ -184,13 +189,35 @@ def test_zipline_feature_store_no_lookahead():
     assert enriched.loc[0, "trailing_30d_listing_bookings"] == 0
     assert enriched.loc[0, "trailing_30d_listing_cancellations"] == 0
 
-    # Second event sees event 0 (which was cancelled)
+    # Second event sees event 0 (which was cancelled on Jan 5 < Jan 10)
     assert enriched.loc[1, "trailing_30d_listing_bookings"] == 1
     assert enriched.loc[1, "trailing_30d_listing_cancellations"] == 1
 
     # Third event sees event 0 and event 1 (1 cancel out of 2 bookings)
     assert enriched.loc[2, "trailing_30d_listing_bookings"] == 2
     assert enriched.loc[2, "trailing_30d_listing_cancellations"] == 1
+
+
+def test_zipline_feature_store_raises_on_missing_cancelled_at():
+    """Verify feature store strictly rejects inputs missing CANCELLED_AT timestamps to prevent leakage."""
+    import pytest
+    data_without_ts = {
+        "LISTING_ID": ["L1"],
+        "BOOKING_CREATED_AT": [pd.Timestamp("2024-01-01")],
+        "BOOKING_STATUS": ["cancelled"]
+    }
+    store = ZiplineFeatureStore(window_days=30)
+    with pytest.raises(ValueError, match="Missing required column 'CANCELLED_AT'"):
+        store.compute_as_of_listing_features(pd.DataFrame(data_without_ts))
+
+    data_with_null_cancel = {
+        "LISTING_ID": ["L1"],
+        "BOOKING_CREATED_AT": [pd.Timestamp("2024-01-01")],
+        "BOOKING_STATUS": ["cancelled"],
+        "CANCELLED_AT": [pd.NaT]
+    }
+    with pytest.raises(ValueError, match="missing explicit 'CANCELLED_AT' event timestamps"):
+        store.compute_as_of_listing_features(pd.DataFrame(data_with_null_cancel))
 
 
 def test_zipline_feature_store_outcome_availability_timestamp():

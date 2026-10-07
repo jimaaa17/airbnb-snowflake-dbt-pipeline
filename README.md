@@ -115,8 +115,8 @@ All metrics queried through the **FastAPI Semantic Gateway** or visualized in th
 | `total_bookings` | Total Reservations Volume | `COUNT(BOOKING_ID)` | Global Operations | Tier-2 Operational |
 | `active_listings_count` | Available Supply Count | `COUNT(DISTINCT LISTING_ID)` | Supply & Host Growth | Supply Health |
 
-* **Dynamic Registry Consumption**: `semantic_api/main.py` dynamically ingests MetricFlow YAML at startup, eliminating duplicate dictionary definitions.
-* **SQL Injection Hardening**: `compile_semantic_sql()` enforces strict whitelist validation on metrics, dimensions, and time grains, alongside parameter escaping for filter values.
+* **Dynamic Registry Consumption**: `semantic_api/main.py` dynamically ingests MetricFlow YAML at startup, eliminating duplicate dictionary definitions and failing fast on broken specifications.
+* **True SQL Parameter Binding**: `compile_semantic_sql()` compiles queries with named pyformat parameter placeholders (`%(param_name)s`) and a bound parameter map, combined with strict allowlist validation on dimensions and grains.
 
 ---
 
@@ -124,7 +124,7 @@ All metrics queried through the **FastAPI Semantic Gateway** or visualized in th
 
 ### 1. Leakage-Free Feature Store (`ZiplineFeatureStore`)
 All feature transformations in [`ml/features/transformers.py`](ml/features/transformers.py) and [`ml/features/feature_store.py`](ml/features/feature_store.py) strictly enforce **train-serve parity** and point-in-time correctness:
-* **Point-in-Time Outcome Availability**: When computing trailing cancellation features, past reservations are only counted if the cancellation event actually occurred prior to observation time (`CANCELLED_AT < t_predict`).
+* **Point-in-Time Outcome Availability**: When computing trailing cancellation features, past reservations are only counted if the cancellation event actually occurred prior to observation time (`CANCELLED_AT < t_predict`). Missing timestamps trigger strict validation errors rather than silently falling back to terminal labels.
 * **Trigonometric Waves**: Circular calendar features (month, day of week) use sinusoidal projection (`sin`, `cos`), eliminating artificial cliff discontinuities between December and January.
 * **Mathematical Derivations**: Complete formulas and division guards are detailed in the [Feature Engineering Specification](docs/FEATURE_ENGINEERING.md).
 
@@ -150,9 +150,9 @@ Evaluated on a strict chronological temporal split (80% train / 20% holdout test
 * **Asymmetric Intervention Economics**: Naive baselines achieve 71% accuracy but deliver 0% recall. The GBDT model flags **$16,203.45** in high-risk bookings (16 reservations). Under a conservative 35% rebooking salvage rate with a 23.6-day advance warning window, the model yields **$5,671.21 in modeled recoverable revenue**. Because automated host outreach costs ($2–$5) are negligible compared to unrecovered vacancy loss ($350–$1,000+), targeted recall delivers clear net positive utility.
 
 ### 4. MLOps, SHAP Diagnostics & Automated CI SLA Gates
-* **MLflow Model Registry**: Centralized tracking (`sqlite:///ml/mlruns.db`) stages vetted pipelines under the `@champion` alias.
+* **MLflow Model Registry**: Centralized tracking (`sqlite:///ml/mlruns.db`) stages vetted pipelines under the `@champion` alias only after passing evaluation quality gates.
 * **SHAP TreeExplainer**: Computes exact Shapley values ([`ml/evaluation/shap_diagnostics.py`](ml/evaluation/shap_diagnostics.py)), explaining why underpriced listings warrant rate increases.
-* **Automated CI SLA Gate**: [`ml/evaluation/eval_gate.py`](ml/evaluation/eval_gate.py) enforces minimum performance gates in CI (Price R² ≥ 0.85, MAPE ≤ 20.0%, Classifier PR-AUC ≥ 0.25, Accuracy ≥ 60.0%).
+* **Automated CI SLA Gate**: [`ml/evaluation/eval_gate.py`](ml/evaluation/eval_gate.py) enforces full performance and SME guardrail criteria before deployment (Price R² ≥ 0.85, MAPE ≤ 20.0%, Guardrail Compliance ≥ 50.0%, Classifier Accuracy ≥ 60.0%, PR-AUC ≥ 0.25, Recall ≥ 10.0%), and gates promotion to the MLflow `@champion` alias.
 
 ---
 

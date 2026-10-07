@@ -134,6 +134,7 @@ metrics:
     type_params:
       numerator: confirmed_bookings
       denominator: total_bookings
+    display_format: percent
 
   - name: booking_conversion_rate
     label: "Booking Conversion Rate (Alias)"
@@ -142,6 +143,7 @@ metrics:
     type_params:
       numerator: confirmed_bookings
       denominator: total_bookings
+    display_format: percent
 
   - name: cancellation_rate
     label: "Booking Cancellation Rate"
@@ -150,6 +152,7 @@ metrics:
     type_params:
       numerator: cancelled_bookings
       denominator: total_bookings
+    display_format: percent
 
   - name: average_booking_value
     label: "Average Booking Value (ABV)"
@@ -158,6 +161,7 @@ metrics:
     type_params:
       numerator: total_revenue
       denominator: total_bookings
+    display_format: currency
 
   - name: active_listings_count
     label: "Active Listings Count"
@@ -173,3 +177,4 @@ metrics:
     type_params:
       numerator: total_revenue
       denominator: active_listings_count
+    display_format: currency

@@ -64,6 +64,12 @@ def run_evaluation_gate():
         logger.error("GATE REJECTED: Price regressor MAPE (%.4f) exceeds max error threshold (%.2f)", price_metrics["mape"], MAX_PRICE_MAPE)
         sys.exit(1)
 
+    guardrail_pct = price_metrics.get("sme_within_guardrails_pct", 0.0)
+    if guardrail_pct < MIN_PRICING_GUARDRAIL_PCT:
+        logger.error("GATE REJECTED: Price regressor guardrail compliance (%.2f%%) below SLA threshold (%.2f%%)",
+                     guardrail_pct * 100, MIN_PRICING_GUARDRAIL_PCT * 100)
+        sys.exit(1)
+
     # 2. Evaluate Cancellation Classifier from MLflow Registry / fallback
     try:
         import mlflow
@@ -78,10 +84,10 @@ def run_evaluation_gate():
         logger.info("Evaluating Cancellation Classifier from local binary fallback: ml/artifacts/cancellation_model.joblib")
 
     cancel_metrics = cancel_model.evaluate(test_df)
-    logger.info("Cancellation Classifier Quality: Accuracy=%.4f (Min SLA=%.2f) | PR-AUC=%.4f (Min SLA=%.2f) | Recall=%.2f%% | Brier=%.4f",
+    logger.info("Cancellation Classifier Quality: Accuracy=%.4f (Min SLA=%.2f) | PR-AUC=%.4f (Min SLA=%.2f) | Recall=%.2f%% (Min SLA=%.2f%%) | Brier=%.4f",
                 cancel_metrics["accuracy"], MIN_CLASSIFIER_ACCURACY,
                 cancel_metrics["pr_auc"], MIN_CLASSIFIER_PR_AUC,
-                cancel_metrics["recall"] * 100,
+                cancel_metrics["recall"] * 100, MIN_CLASSIFIER_RECALL * 100,
                 cancel_metrics.get("brier_score", 0.0))
     logger.info("SME Cancellation Impact: Revenue Protected=$%.2f (%.1f%% capture) | Salvaged Yield=$%.2f",
                 cancel_metrics.get("sme_revenue_protected_usd", 0.0),
@@ -94,6 +100,11 @@ def run_evaluation_gate():
 
     if cancel_metrics["pr_auc"] < MIN_CLASSIFIER_PR_AUC:
         logger.error("GATE REJECTED: Cancellation PR-AUC (%.4f) below SLA threshold (%.2f)", cancel_metrics["pr_auc"], MIN_CLASSIFIER_PR_AUC)
+        sys.exit(1)
+
+    recall_pct = cancel_metrics.get("recall", 0.0)
+    if recall_pct < MIN_CLASSIFIER_RECALL:
+        logger.error("GATE REJECTED: Cancellation recall (%.4f) below SLA threshold (%.2f)", recall_pct, MIN_CLASSIFIER_RECALL)
         sys.exit(1)
 
     logger.info("ALL MODEL QUALITY & SME GATES PASSED! Validated for production deployment.")
