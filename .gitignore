@@ -23,5 +23,9 @@ pipeline_dag.png
 build_job_aid_docx.py
 render_dag_image.py
 
-# Model artifacts
+# Model artifacts & MLflow
 *.joblib
+mlruns/
+*.db
+ml/artifacts/mlruns/
+ml/artifacts/*_metrics.json

@@ -9,9 +9,40 @@ from ml.models.price_regressor import PriceRegressor
 class BatchPredictor:
     """Executes scalable batch scoring across large booking/listing partitions."""
 
-    def __init__(self, cancellation_model_path: str, price_model_path: str):
-        self.cancellation_model = CancellationClassifier({}).load(cancellation_model_path)
-        self.price_model = PriceRegressor({}).load(price_model_path)
+    def __init__(
+        self,
+        cancellation_model_path: str = "models:/cancellation_classifier@champion",
+        price_model_path: str = "models:/price_regressor@champion"
+    ):
+        # 1. Cancellation Model
+        try:
+            if cancellation_model_path.startswith("models:/"):
+                import mlflow
+                from ml.tracking.tracker import get_default_tracking_uri
+                mlflow.set_tracking_uri(get_default_tracking_uri())
+                c_pipe = mlflow.sklearn.load_model(cancellation_model_path)
+                self.cancellation_model = CancellationClassifier({})
+                self.cancellation_model.pipeline = c_pipe
+                self.cancellation_model.is_fitted = True
+            else:
+                self.cancellation_model = CancellationClassifier({}).load(cancellation_model_path)
+        except Exception:
+            self.cancellation_model = CancellationClassifier({}).load("ml/artifacts/cancellation_model.joblib")
+
+        # 2. Price Regressor Model
+        try:
+            if price_model_path.startswith("models:/"):
+                import mlflow
+                from ml.tracking.tracker import get_default_tracking_uri
+                mlflow.set_tracking_uri(get_default_tracking_uri())
+                p_pipe = mlflow.sklearn.load_model(price_model_path)
+                self.price_model = PriceRegressor({})
+                self.price_model.pipeline = p_pipe
+                self.price_model.is_fitted = True
+            else:
+                self.price_model = PriceRegressor({}).load(price_model_path)
+        except Exception:
+            self.price_model = PriceRegressor({}).load("ml/artifacts/price_regressor.joblib")
 
     def score_dataset(self, df: pd.DataFrame) -> pd.DataFrame:
         """Enriches dataset with model predictions."""

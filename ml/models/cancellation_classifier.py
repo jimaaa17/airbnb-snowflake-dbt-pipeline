@@ -12,7 +12,7 @@ from sklearn.ensemble import GradientBoostingClassifier
 from ml.models.base import BaseAirbnbModel
 from ml.features.transformers import AirbnbFeatureEngineer
 from ml.features.feature_store import ZiplineFeatureStore
-from ml.evaluation.metrics import evaluate_classification
+from ml.evaluation.metrics import evaluate_classification, evaluate_cancellation_sme_impact
 
 class CancellationClassifier(BaseAirbnbModel):
     """Predicts probability of a booking cancellation at reservation creation."""
@@ -88,7 +88,10 @@ class CancellationClassifier(BaseAirbnbModel):
         y_prob = self.pipeline.predict_proba(enriched_df)[:, 1]
         y_pred = (y_prob >= self.decision_threshold).astype(int)
 
-        return evaluate_classification(y, y_pred, y_prob)
+        metrics = evaluate_classification(y, y_pred, y_prob)
+        sme_metrics = evaluate_cancellation_sme_impact(df_test, y, y_pred, y_prob)
+        metrics.update(sme_metrics)
+        return metrics
 
     def predict_proba(self, df: pd.DataFrame) -> np.ndarray:
         if not self.is_fitted:

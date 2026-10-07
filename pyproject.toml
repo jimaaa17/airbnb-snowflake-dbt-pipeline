@@ -22,6 +22,8 @@ dependencies = [
     "xgboost>=3.4.1",
     "joblib>=1.6.0",
     "pyyaml>=6.0.3",
+    "mlflow>=3.16.1",
+    "shap>=0.52.0",
 ]   
 
 [tool.uv]

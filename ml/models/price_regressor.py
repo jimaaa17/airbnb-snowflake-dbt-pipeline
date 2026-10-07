@@ -11,7 +11,7 @@ from sklearn.ensemble import GradientBoostingRegressor
 
 from ml.models.base import BaseAirbnbModel
 from ml.features.transformers import AirbnbFeatureEngineer
-from ml.evaluation.metrics import evaluate_regression
+from ml.evaluation.metrics import evaluate_regression, evaluate_pricing_sme_impact
 
 class PriceRegressor(BaseAirbnbModel):
     """Predicts fair market price per night for a listing."""
@@ -64,14 +64,17 @@ class PriceRegressor(BaseAirbnbModel):
         y_pred = self.pipeline.predict(df)
         return evaluate_regression(y, y_pred)
 
-    def evaluate(self, df_test: pd.DataFrame) -> Dict[str, float]:
+    def evaluate(self, df_test: pd.DataFrame) -> Dict[str, Any]:
         if not self.is_fitted:
             raise RuntimeError("Model must be trained before evaluation.")
         df = df_test.copy()
         y = pd.to_numeric(df["PRICE_PER_NIGHT"]).to_numpy()
 
         y_pred = self.pipeline.predict(df)
-        return evaluate_regression(y, y_pred)
+        metrics = evaluate_regression(y, y_pred)
+        sme_metrics = evaluate_pricing_sme_impact(df, y, y_pred)
+        metrics.update(sme_metrics)
+        return metrics
 
     def predict(self, df: pd.DataFrame) -> np.ndarray:
         if not self.is_fitted:

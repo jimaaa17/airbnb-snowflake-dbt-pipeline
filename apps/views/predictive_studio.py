@@ -1,11 +1,13 @@
 """Predictive Machine Learning Studio & Real-Time Decisioning.
 
-Delivers point-in-time dynamic pricing recommendations and proactive
-cancellation risk assessment powered by serialized Gradient Boosting pipelines.
+Delivers point-in-time dynamic pricing recommendations, transparent SHAP interpretability,
+underpriced gap diagnostics, and proactive cancellation risk assessment.
 """
 
 import streamlit as st
 import pandas as pd
+import numpy as np
+import altair as alt
 from apps.components.data_store import get_model_artifact_status
 from ml.inference.service import (
     ModelInferenceService,
@@ -13,10 +15,69 @@ from ml.inference.service import (
     PricePredictionRequest,
 )
 
+CASE_STUDY_PRESETS = {
+    "✨ Custom Listing Sandbox": {
+        "city": "Paris",
+        "room_type": "Entire home",
+        "prop_type": "Apartment",
+        "accommodates": 4,
+        "bedrooms": 2,
+        "bathrooms": 1.5,
+        "cleaning_fee": 65.0,
+        "actual_price": 240.0,
+        "response_rate": 95.0,
+        "superhost": "TRUE",
+        "checkin_season": "2024-06-15 (Peak Summer)",
+        "description": "Adjust sliders and options freely to explore real-time prediction and SHAP attribution changes."
+    },
+    "Case Study #1: Paris High-Capacity Room (LST_0269) — Underpriced by $79.15": {
+        "city": "Paris",
+        "room_type": "Private room",
+        "prop_type": "Apartment",
+        "accommodates": 6,
+        "bedrooms": 2,
+        "bathrooms": 2.0,
+        "cleaning_fee": 65.0,
+        "actual_price": 225.35,
+        "response_rate": 95.0,
+        "superhost": "TRUE",
+        "checkin_season": "2024-06-15 (Peak Summer)",
+        "description": "Host listed a 6-guest private room in central Paris at only $225.35/night. The model values it at ~$300/night due to high capacity and prime Paris location, leaving $79.15/night on the table."
+    },
+    "Case Study #2: San Francisco Deep Budget Listing (LST_0140) — Underpriced by $71.05": {
+        "city": "San Francisco",
+        "room_type": "Private room",
+        "prop_type": "Apartment",
+        "accommodates": 1,
+        "bedrooms": 1,
+        "bathrooms": 1.0,
+        "cleaning_fee": 35.0,
+        "actual_price": 46.21,
+        "response_rate": 90.0,
+        "superhost": "FALSE",
+        "checkin_season": "2024-06-15 (Peak Summer)",
+        "description": "Host offered a room in San Francisco at $46.21/night. City location demand floor and weekend check-in pushed fair value to ~$117/night, flagging an extreme $71.05/night underpricing."
+    },
+    "Case Study #3: London Multi-Guest Room (LST_0280) — Underpriced by $63.67": {
+        "city": "London",
+        "room_type": "Private room",
+        "prop_type": "Apartment",
+        "accommodates": 3,
+        "bedrooms": 2,
+        "bathrooms": 1.5,
+        "cleaning_fee": 50.0,
+        "actual_price": 131.53,
+        "response_rate": 95.0,
+        "superhost": "TRUE",
+        "checkin_season": "2024-06-15 (Peak Summer)",
+        "description": "Host listed for 3 guests at $131.53 in central London. Favorable bedroom-to-capacity ratio and London baseline demand valued it at ~$195/night, leaving $63.67/night uncaptured."
+    }
+}
+
 
 def render():
-    st.markdown("### Predictive ML Studio & Decision Engine")
-    st.caption("Real-time inference microservices driven by Point-in-Time Feature Store snapshots.")
+    st.markdown("### Predictive ML Studio & Interpretability Engine")
+    st.caption("Point-in-time scoring, live SHAP attribution, and host underpriced gap diagnostics.")
 
     has_artifacts, c_path, p_path = get_model_artifact_status()
     if not has_artifacts:
@@ -29,60 +90,264 @@ def render():
     service = ModelInferenceService(c_path, p_path)
 
     tab_pricing, tab_canc, tab_eval = st.tabs([
-        "💵 Dynamic Pricing & Guardrails",
+        "💵 Dynamic Pricing & SHAP Explainer",
         "🎯 Cancellation Risk Assessor",
         "📊 Model Health & Governance"
     ])
 
-    # 1. Dynamic Pricing Tab
+    # =========================================================================
+    # 1. DYNAMIC PRICING & SHAP EXPLAINER TAB
+    # =========================================================================
     with tab_pricing:
-        st.markdown('<p class="section-header">Nightly Price Estimator & Yield Guardrails</p>', unsafe_allow_html=True)
-        st.caption("Predicts the competitive fair market price based on property attributes, market density, and host quality.")
+        st.markdown('<p class="section-header">Interactive Pricing Discrepancy & Root Cause Explorer</p>', unsafe_allow_html=True)
+        st.caption("Inspect how changing physical attributes, seasonality, and location dynamically shifts fair market value and reveals money left on the table.")
 
+        # Preset Selector
+        preset_names = list(CASE_STUDY_PRESETS.keys())
+        selected_preset = st.selectbox(
+            "🎯 Load Pre-Diagnosed Case Study or Custom Sandbox:",
+            preset_names,
+            index=1,  # Default to Case Study #1 for instant demonstration
+            key="pricing_preset_selector"
+        )
+        preset = CASE_STUDY_PRESETS[selected_preset]
+        st.info(f"📌 **Case Study Overview:** {preset['description']}")
+
+        # Form Controls layout
         p_col1, p_col2 = st.columns(2)
         with p_col1:
-            p_city = st.selectbox("Target Market:", ["New York", "Paris", "Tokyo", "London", "Berlin", "San Francisco"], key="pr_city")
-            p_room = st.selectbox("Room Category:", ["Entire home", "Private room"], key="pr_room")
-            p_prop = st.selectbox("Property Type:", ["Apartment", "Condo", "House"], key="pr_prop")
-            p_superhost = st.selectbox("Host Superhost Tier:", ["TRUE", "FALSE"], key="pr_sh")
+            st.markdown("##### 📍 Location, Space & Timing")
+            city_options = ["Paris", "San Francisco", "London", "Berlin", "New York", "Tokyo"]
+            p_city = st.selectbox("Target Market (City):", city_options, index=city_options.index(preset["city"]) if preset["city"] in city_options else 0, key="pr_city")
+            
+            room_options = ["Entire home", "Private room"]
+            p_room = st.selectbox("Room Category:", room_options, index=room_options.index(preset["room_type"]), key="pr_room")
+            
+            prop_options = ["Apartment", "Condo", "House"]
+            p_prop = st.selectbox("Property Type:", prop_options, index=prop_options.index(preset["prop_type"]), key="pr_prop")
+            
+            season_options = [
+                "2024-06-15 (Peak Summer / Month 6)",
+                "2024-05-15 (Late Spring / Month 5)",
+                "2024-01-15 (Off-Peak Winter / Month 1)",
+                "2024-10-15 (Autumn Shoulder / Month 10)"
+            ]
+            default_season_idx = 0 if "June" in preset["checkin_season"] else 1
+            p_season = st.selectbox("Check-in Date & Seasonality:", season_options, index=default_season_idx, key="pr_season")
+            booking_date_val = p_season.split(" ")[0]
+
+            sh_options = ["TRUE", "FALSE"]
+            p_superhost = st.selectbox("Host Superhost Tier:", sh_options, index=sh_options.index(preset["superhost"]), key="pr_sh")
 
         with p_col2:
-            p_acc = st.slider("Guest Capacity:", min_value=1, max_value=10, value=4, key="pr_acc")
-            p_bed = st.slider("Bedrooms:", min_value=1, max_value=6, value=2, key="pr_bed")
-            p_bath = st.slider("Bathrooms:", min_value=1.0, max_value=4.0, value=1.5, step=0.5, key="pr_bath")
-            p_resp = st.slider("Host Responsiveness (%):", min_value=50.0, max_value=100.0, value=95.0, key="pr_resp")
+            st.markdown("##### 📐 Capacity & Host Pricing")
+            p_acc = st.slider("Guest Capacity (Accommodates):", min_value=1, max_value=10, value=preset["accommodates"], key="pr_acc")
+            p_bed = st.slider("Bedrooms:", min_value=1, max_value=6, value=preset["bedrooms"], key="pr_bed")
+            p_bath = st.slider("Bathrooms:", min_value=1.0, max_value=4.0, value=preset["bathrooms"], step=0.5, key="pr_bath")
+            p_clean = st.slider("Cleaning Fee ($):", min_value=15.0, max_value=150.0, value=preset["cleaning_fee"], step=5.0, key="pr_clean")
+            p_actual = st.number_input("Host Actual Listed Price ($/night):", min_value=20.0, max_value=800.0, value=preset["actual_price"], step=5.0, key="pr_actual")
+            p_resp = st.slider("Host Responsiveness (%):", min_value=50.0, max_value=100.0, value=preset["response_rate"], step=5.0, key="pr_resp")
 
+        # Execute Live Inference & SHAP Explanation
         p_req = PricePredictionRequest(
             accommodates=p_acc,
             bedrooms=p_bed,
             bathrooms=p_bath,
-            cleaning_fee=65.0,
+            cleaning_fee=p_clean,
             property_type=p_prop,
             room_type=p_room,
             city=p_city,
             is_superhost=p_superhost,
             response_rate=p_resp,
-            response_rate_band="VERY GOOD" if p_resp >= 90 else "GOOD"
+            response_rate_band="VERY GOOD" if p_resp >= 90 else "GOOD",
+            booking_date=booking_date_val,
+            booking_created_at="2024-05-01",
+            actual_price=p_actual
         )
 
-        p_res = service.predict_fair_price(p_req)
+        p_res = service.explain_fair_price(p_req)
 
+        # ---------------------------------------------------------------------
+        # LIVE PREDICTION & DISCREPANCY KPI ROW
+        # ---------------------------------------------------------------------
+        st.markdown("<hr style='margin: 1.5rem 0;'>", unsafe_allow_html=True)
+        st.markdown("#### 📊 Live Model Decisioning & Financial Discrepancy")
+
+        kpi1, kpi2, kpi3, kpi4 = st.columns(4)
+        with kpi1:
+            st.metric(
+                "Predicted Fair Market Price",
+                f"${p_res.predicted_fair_price_per_night:.2f}/night",
+                help="Model estimate of competitive market rate based on capacity, city, and seasonal demand."
+            )
+        with kpi2:
+            st.metric(
+                "Host Actual Listed Price",
+                f"${p_res.actual_price:.2f}/night",
+                help="The host's current listing price set on the calendar."
+            )
+        with kpi3:
+            gap = p_res.price_gap or 0.0
+            if p_res.pricing_status == "UNDERPRICED":
+                status_color = "#D70466"
+                status_badge = f"🚨 Underpriced (+${gap:.2f}/nt)"
+                st.metric("Discrepancy Gap", f"+${gap:.2f}/night", delta=f"+${gap:.2f} Money Left on Table", delta_color="inverse")
+            elif p_res.pricing_status == "OVERPRICED":
+                status_badge = f"⚠️ Overpriced (${gap:.2f}/nt)"
+                st.metric("Discrepancy Gap", f"${gap:.2f}/night", delta=f"${gap:.2f} Vacancy Risk", delta_color="normal")
+            else:
+                status_badge = "🛡️ Within Guardrails"
+                st.metric("Discrepancy Gap", f"${abs(gap):.2f}/night", delta="Optimal Range (±10%)", delta_color="off")
+
+        with kpi4:
+            if p_res.monthly_opportunity_usd and p_res.monthly_opportunity_usd > 0:
+                st.metric(
+                    "Est. Monthly Profit Recovery",
+                    f"+${p_res.monthly_opportunity_usd:,.2f}/mo",
+                    delta="+15 Booked Nights/Mo",
+                    help="Additional monthly revenue host would earn by pricing at fair market value for 15 booked nights."
+                )
+            else:
+                st.metric("Recommended Guardrails", f"${p_res.recommended_min_guardrail:.0f} - ${p_res.recommended_max_guardrail:.0f}")
+
+        # ---------------------------------------------------------------------
+        # HOW THE NUMBERS WERE CALCULATED (MATHEMATICAL TRANSPARENCY)
+        # ---------------------------------------------------------------------
         st.markdown("<br>", unsafe_allow_html=True)
-        pr1, pr2, pr3 = st.columns(3)
-        with pr1:
-            st.metric("Fair Market Price", f"${p_res.predicted_fair_price_per_night:.2f}/night")
-        with pr2:
-            st.metric("Recommended Floor", f"${p_res.recommended_min_guardrail:.2f}", delta="-15% Floor")
-        with pr3:
-            st.metric("Recommended Ceiling", f"${p_res.recommended_max_guardrail:.2f}", delta="+25% Ceiling")
+        with st.container():
+            st.markdown(
+                f"""
+                <div style="background: #F8F9FA; border: 1px solid #E5E7EB; border-left: 5px solid #FF385C; border-radius: 8px; padding: 18px 22px; margin-bottom: 20px;">
+                    <h5 style="margin: 0 0 10px 0; color: #111827; font-weight: 700;">
+                        📐 Mathematical Walkthrough: How the Model Calculated These Numbers
+                    </h5>
+                    <p style="margin: 0 0 12px 0; font-size: 0.92rem; color: #374151;">
+                        Gradient Boosting models compute predictions by starting at a <b>Global Base Value</b> (expected value <code>E[f(X)]</code> across all training listings) 
+                        and adding or subtracting exact dollar attributions (<b>SHAP values</b>) for each feature:
+                    </p>
+                    <div style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 6px; padding: 12px 16px; font-family: monospace; font-size: 0.95rem; margin-bottom: 12px;">
+                        <b>Fair Market Price</b> = Baseline ($ {p_res.base_expected_value:.2f}) + Net Feature Adjustments ({p_res.net_shap_adjustment:+.2f}) = <b>$ {p_res.predicted_fair_price_per_night:.2f} / night</b>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; font-size: 0.85rem; color: #4B5563;">
+                        <div style="background: #FFFFFF; padding: 10px; border-radius: 6px; border: 1px solid #E5E7EB;">
+                            <b>1. Global Baseline Anchor:</b><br>
+                            <code>$ {p_res.base_expected_value:.2f} / night</code><br>
+                            <span style="font-size: 0.78rem; color: #6B7280;">Average price across all 1,200 training listings.</span>
+                        </div>
+                        <div style="background: #FFFFFF; padding: 10px; border-radius: 6px; border: 1px solid #E5E7EB;">
+                            <b>2. Net SHAP Shift:</b><br>
+                            <code>{p_res.net_shap_adjustment:+.2f} / night</code><br>
+                            <span style="font-size: 0.78rem; color: #6B7280;">Sum of positive lifts and negative discounts.</span>
+                        </div>
+                        <div style="background: #FFFFFF; padding: 10px; border-radius: 6px; border: 1px solid #E5E7EB;">
+                            <b>3. Nightly Revenue Gap:</b><br>
+                            <code>$ {p_res.predicted_fair_price_per_night:.2f} - $ {p_res.actual_price:.2f} = {gap:+.2f}</code><br>
+                            <span style="font-size: 0.78rem; color: #6B7280;">Dollar difference between fair rate and actual rate.</span>
+                        </div>
+                        <div style="background: #FFFFFF; padding: 10px; border-radius: 6px; border: 1px solid #E5E7EB;">
+                            <b>4. Monthly Uplift:</b><br>
+                            <code>$ {gap:.2f} × 15 nights = +${(gap * 15):,.2f}</code><br>
+                            <span style="font-size: 0.78rem; color: #6B7280;">Based on standard 50% occupancy (15 nights/month).</span>
+                        </div>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
 
-        st.info(
-            f"💡 **Pricing Strategy Recommendation:** For a {p_prop} in {p_city} accommodating {p_acc} guests, "
-            f"we recommend setting base nightly pricing between **${p_res.recommended_min_guardrail:.2f}** and **${p_res.recommended_max_guardrail:.2f}** "
-            f"to optimize occupancy and conversion while defending yield."
-        )
+        # ---------------------------------------------------------------------
+        # INTERACTIVE SHAP WATERFALL / ATTRIBUTION CHART
+        # ---------------------------------------------------------------------
+        st.markdown("##### 🔬 Feature-by-Feature SHAP Attribution Breakdown")
+        st.caption("Each bar represents the exact dollar amount that specific attribute pushed the price UP (green) or DOWN (red).")
 
-    # 2. Cancellation Risk Assessor
+        df_contributions = pd.DataFrame(p_res.contributions[:10])
+        if not df_contributions.empty:
+            chart = alt.Chart(df_contributions).mark_bar(cornerRadius=4).encode(
+                x=alt.X("impact:Q", title="Impact on Nightly Fair Price ($ / night)"),
+                y=alt.Y(
+                    "display_name:N",
+                    sort=alt.EncodingSortField(field="impact", order="descending"),
+                    title="Listing Attribute / Feature"
+                ),
+                color=alt.Color(
+                    "direction:N",
+                    scale=alt.Scale(
+                        domain=["Increases Price", "Reduces Price"],
+                        range=["#008A05", "#D70466"]
+                    ),
+                    title="Directional Influence"
+                ),
+                tooltip=[
+                    alt.Tooltip("display_name:N", title="Attribute"),
+                    alt.Tooltip("impact:Q", title="Dollar Shift ($)", format="+.2f"),
+                    alt.Tooltip("direction:N", title="Effect")
+                ]
+            ).properties(height=340)
+
+            st.altair_chart(chart, use_container_width=True)
+
+        # ---------------------------------------------------------------------
+        # COHORT ROOT-CAUSE ANALYSIS: WHY 58 LISTINGS WERE UNDERPRICED
+        # ---------------------------------------------------------------------
+        with st.expander("📚 Root Cause Diagnostics: Why 58 Listings (19.3%) Were Underpriced Across the Market", expanded=False):
+            st.markdown(
+                """
+                In our holdout evaluation of 300 test listings, **58 listings (19.3%)** were classified as **underpriced** 
+                (actual listed price was below 90% of model fair market value), with an average gap of **$33.23 / night**.
+
+                Here is the root-cause analysis explaining why this discrepancy occurs across the marketplace:
+                """
+            )
+            rc1, rc2, rc3 = st.columns(3)
+            with rc1:
+                st.markdown(
+                    """
+                    <div style="background:#FFF; padding:12px; border-radius:8px; border:1px solid #EBEBEB; height:100%;">
+                        <span style="font-size:1.1rem;">🛏️</span> <b>1. Private Room Capacity Mismatch</b><br>
+                        <p style="font-size:0.83rem; color:#555; margin-top:6px;">
+                            <b>65.5%</b> of underpriced listings were <code>Private room</code> categories. Hosts set low flat 
+                            rates ($46–$140), but offered capacity for 3 to 6 guests. The model correctly recognizes capacity value 
+                            (<code>ACCOMMODATES</code> SHAP pushes price up by +$75/nt).
+                        </p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+            with rc2:
+                st.markdown(
+                    """
+                    <div style="background:#FFF; padding:12px; border-radius:8px; border:1px solid #EBEBEB; height:100%;">
+                        <span style="font-size:1.1rem;">☀️</span> <b>2. Seasonal Peak Inflexibility</b><br>
+                        <p style="font-size:0.83rem; color:#555; margin-top:6px;">
+                            <b>79.3%</b> of underpriced bookings checked in during <b>June (Month 6)</b>. 
+                            Cyclical sine/cosine features (<code>arrival_month_sin</code>) added summer surge demand, but hosts 
+                            failed to update winter/spring flat rates.
+                        </p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+            with rc3:
+                st.markdown(
+                    """
+                    <div style="background:#FFF; padding:12px; border-radius:8px; border:1px solid #EBEBEB; height:100%;">
+                        <span style="font-size:1.1rem;">🏙️</span> <b>3. Prime Metro Price Lag</b><br>
+                        <p style="font-size:0.83rem; color:#555; margin-top:6px;">
+                            High concentration in expensive international destinations: <b>Berlin (29.3%)</b>, <b>Paris (24.1%)</b>, 
+                            and <b>San Francisco (10.3%)</b>. Hosts failed to adjust to surging tourist demand floors.
+                        </p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.caption("Artifact references: Generated SHAP summary plots are saved in `ml/artifacts/shap/` and tracked in MLflow Model Registry.")
+
+    # =========================================================================
+    # 2. CANCELLATION RISK ASSESSOR TAB
+    # =========================================================================
     with tab_canc:
         st.markdown('<p class="section-header">Real-Time Cancellation Propensity Scoring</p>', unsafe_allow_html=True)
         st.caption("Scores risk at reservation creation time to trigger automated retention incentives before check-in.")
@@ -151,7 +416,9 @@ def render():
         else:
             st.success("✅ **Standard Reservation:** Reservation satisfies platform stability guidelines.")
 
-    # 3. Model Health & Governance Tab
+    # =========================================================================
+    # 3. MODEL HEALTH & GOVERNANCE TAB
+    # =========================================================================
     with tab_eval:
         st.markdown('<p class="section-header">Production Model Governance & Evaluation Gate</p>', unsafe_allow_html=True)
         st.caption("All models are validated against chronological temporal test holdouts (zero lookahead leakage).")
@@ -172,7 +439,7 @@ def render():
             st.dataframe(pd.DataFrame([
                 {"Metric": "R² (Variance Explained)", "Holdout Value": "0.9483", "Production Gate": "≥ 0.85 (PASS)"},
                 {"Metric": "MAPE (Error Rate)", "Holdout Value": "10.34%", "Production Gate": "≤ 20.0% (PASS)"},
-                {"Metric": "RMSE (Root Mean Sq)", "Holdout Value": "$25.78", "Production Gate": "Monitored"},
-                {"Metric": "MAE (Mean Absolute)", "Holdout Value": "$20.54", "Production Gate": "Monitored"},
+                {"Metric": "Underpriced Gap", "Holdout Value": "$33.23/night", "Production Gate": "Monitored (19.3% flagged)"},
+                {"Metric": "Est. Monthly Uplift", "Holdout Value": "$498.45/listing", "Production Gate": "Target > $300"},
                 {"Metric": "Model File", "Holdout Value": "price_regressor.joblib", "Production Gate": "SHA-256 Verified"}
             ]), use_container_width=True)
