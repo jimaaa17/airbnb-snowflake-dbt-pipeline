@@ -5,16 +5,12 @@ on:
     branches: [main]
     paths:
       - 'airbnb_snowflake_dbt_pipeline/**'
-      - 'pyproject.toml'
-      - 'uv.lock'
-      - '.github/workflows/**'
+      - '.github/workflows/dbt_ci_cd.yml'
   push:
     branches: [main]
     paths:
       - 'airbnb_snowflake_dbt_pipeline/**'
-      - 'pyproject.toml'
-      - 'uv.lock'
-      - '.github/workflows/**'
+      - '.github/workflows/dbt_ci_cd.yml'
   workflow_dispatch:
     inputs:
       action:
