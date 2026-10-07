@@ -52,6 +52,10 @@ class PricePredictionResponse(BaseModel):
     predicted_fair_price_per_night: float
     recommended_min_guardrail: float
     recommended_max_guardrail: float
+    actual_price: Optional[float] = None
+    price_gap: Optional[float] = None
+    pricing_status: Optional[str] = None
+    monthly_opportunity_usd: Optional[float] = None
 
 class PriceExplanationResponse(BaseModel):
     predicted_fair_price_per_night: float
@@ -162,10 +166,27 @@ class ModelInferenceService:
         pred_price = float(self.price_model.predict(df)[0])
         fair_price = round(max(25.0, pred_price), 2)
 
+        price_gap = None
+        pricing_status = None
+        monthly_opp = None
+        if req.actual_price is not None:
+            price_gap = round(fair_price - req.actual_price, 2)
+            if req.actual_price < (fair_price * 0.90):
+                pricing_status = "UNDERPRICED"
+                monthly_opp = round(price_gap * 15.0, 2)
+            elif req.actual_price > (fair_price * 1.10):
+                pricing_status = "OVERPRICED"
+            else:
+                pricing_status = "WITHIN_GUARDRAILS"
+
         return PricePredictionResponse(
             predicted_fair_price_per_night=fair_price,
             recommended_min_guardrail=round(fair_price * 0.85, 2),
-            recommended_max_guardrail=round(fair_price * 1.25, 2)
+            recommended_max_guardrail=round(fair_price * 1.25, 2),
+            actual_price=req.actual_price,
+            price_gap=price_gap,
+            pricing_status=pricing_status,
+            monthly_opportunity_usd=monthly_opp
         )
 
     def explain_fair_price(self, req: PricePredictionRequest) -> PriceExplanationResponse:

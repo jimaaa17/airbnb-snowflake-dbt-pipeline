@@ -1,6 +1,6 @@
 """Predictive Machine Learning Studio & Real-Time Decisioning.
 
-Delivers point-in-time dynamic pricing recommendations, transparent SHAP interpretability,
+Delivers point-in-time dynamic pricing recommendations, yield guardrails,
 underpriced gap diagnostics, and proactive cancellation risk assessment.
 """
 
@@ -28,7 +28,7 @@ CASE_STUDY_PRESETS = {
         "response_rate": 95.0,
         "superhost": "TRUE",
         "checkin_season": "2024-06-15 (Peak Summer)",
-        "description": "Adjust sliders and options freely to explore real-time prediction and SHAP attribution changes."
+        "description": "Adjust sliders and options freely to explore real-time pricing and guardrail recommendations."
     },
     "Case Study #1: Paris High-Capacity Room (LST_0269) — Underpriced by $79.15": {
         "city": "Paris",
@@ -75,9 +75,26 @@ CASE_STUDY_PRESETS = {
 }
 
 
+@st.cache_resource(show_spinner="Loading trained ML models & feature pipelines...")
+def load_inference_service(c_path: str, p_path: str) -> ModelInferenceService:
+    """Loads and caches the ML inference service, ensuring latest feature transformer definitions."""
+    import importlib
+    import ml.features.transformers
+    import ml.models.price_regressor
+    import ml.models.cancellation_classifier
+    import ml.inference.service
+
+    importlib.reload(ml.features.transformers)
+    importlib.reload(ml.models.price_regressor)
+    importlib.reload(ml.models.cancellation_classifier)
+    importlib.reload(ml.inference.service)
+
+    return ml.inference.service.ModelInferenceService(c_path, p_path)
+
+
 def render():
-    st.markdown("### Predictive ML Studio & Interpretability Engine")
-    st.caption("Point-in-time scoring, live SHAP attribution, and host underpriced gap diagnostics.")
+    st.markdown("### Predictive ML Studio & Real-Time Decisioning")
+    st.caption("Point-in-time scoring, dynamic price guardrails, and host underpriced gap diagnostics.")
 
     has_artifacts, c_path, p_path = get_model_artifact_status()
     if not has_artifacts:
@@ -87,16 +104,16 @@ def render():
         )
         return
 
-    service = ModelInferenceService(c_path, p_path)
+    service = load_inference_service(c_path, p_path)
 
     tab_pricing, tab_canc, tab_eval = st.tabs([
-        "💵 Dynamic Pricing & SHAP Explainer",
+        "💵 Dynamic Pricing & Yield Guardrails",
         "🎯 Cancellation Risk Assessor",
         "📊 Model Health & Governance"
     ])
 
     # =========================================================================
-    # 1. DYNAMIC PRICING & SHAP EXPLAINER TAB
+    # 1. DYNAMIC PRICING & YIELD GUARDRAILS TAB
     # =========================================================================
     with tab_pricing:
         st.markdown('<p class="section-header">Interactive Pricing Discrepancy & Root Cause Explorer</p>', unsafe_allow_html=True)
@@ -189,14 +206,10 @@ def render():
         with kpi3:
             gap = p_res.price_gap or 0.0
             if p_res.pricing_status == "UNDERPRICED":
-                status_color = "#D70466"
-                status_badge = f"🚨 Underpriced (+${gap:.2f}/nt)"
                 st.metric("Discrepancy Gap", f"+${gap:.2f}/night", delta=f"+${gap:.2f} Money Left on Table", delta_color="inverse")
             elif p_res.pricing_status == "OVERPRICED":
-                status_badge = f"⚠️ Overpriced (${gap:.2f}/nt)"
                 st.metric("Discrepancy Gap", f"${gap:.2f}/night", delta=f"${gap:.2f} Vacancy Risk", delta_color="normal")
             else:
-                status_badge = "🛡️ Within Guardrails"
                 st.metric("Discrepancy Gap", f"${abs(gap):.2f}/night", delta="Optimal Range (±10%)", delta_color="off")
 
         with kpi4:
@@ -211,9 +224,31 @@ def render():
                 st.metric("Recommended Guardrails", f"${p_res.recommended_min_guardrail:.0f} - ${p_res.recommended_max_guardrail:.0f}")
 
         # ---------------------------------------------------------------------
-        # HOW THE NUMBERS WERE CALCULATED (MATHEMATICAL TRANSPARENCY)
+        # ACTIONABLE STRATEGY RECOMMENDATION
         # ---------------------------------------------------------------------
         st.markdown("<br>", unsafe_allow_html=True)
+        if p_res.pricing_status == "UNDERPRICED":
+            st.warning(
+                f"🚨 **Host Pricing Opportunity:** Listed at **${p_res.actual_price:.2f}/night**, which is underpriced relative to "
+                f"fair market value (**${p_res.predicted_fair_price_per_night:.2f}/night**). Adjusting within recommended guardrails "
+                f"(**${p_res.recommended_min_guardrail:.2f} – ${p_res.recommended_max_guardrail:.2f}**) could capture an estimated "
+                f"**+${p_res.monthly_opportunity_usd:,.2f}/month** across 15 booked nights."
+            )
+        elif p_res.pricing_status == "OVERPRICED":
+            st.error(
+                f"⚠️ **Vacancy Risk Detected:** Listed rate of **${p_res.actual_price:.2f}/night** is over 10% above "
+                f"market fair value (**${p_res.predicted_fair_price_per_night:.2f}/night**). Consider adjusting toward "
+                f"**${p_res.recommended_max_guardrail:.2f}** to preserve booking conversion."
+            )
+        else:
+            st.success(
+                f"✅ **Optimal Pricing Tier:** Listed rate of **${p_res.actual_price:.2f}/night** is within recommended "
+                f"market guardrails (**${p_res.recommended_min_guardrail:.2f} – ${p_res.recommended_max_guardrail:.2f}**)."
+            )
+
+        # ---------------------------------------------------------------------
+        # MATHEMATICAL WALKTHROUGH
+        # ---------------------------------------------------------------------
         with st.container():
             st.markdown(
                 f"""
@@ -226,12 +261,12 @@ def render():
                         and adding or subtracting exact dollar attributions (<b>SHAP values</b>) for each feature:
                     </p>
                     <div style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 6px; padding: 12px 16px; font-family: monospace; font-size: 0.95rem; margin-bottom: 12px;">
-                        <b>Fair Market Price</b> = Baseline ($ {p_res.base_expected_value:.2f}) + Net Feature Adjustments ({p_res.net_shap_adjustment:+.2f}) = <b>$ {p_res.predicted_fair_price_per_night:.2f} / night</b>
+                        <b>Fair Market Price</b> = Baseline (${p_res.base_expected_value:.2f}) + Net Feature Adjustments ({p_res.net_shap_adjustment:+.2f}) = <b>${p_res.predicted_fair_price_per_night:.2f} / night</b>
                     </div>
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; font-size: 0.85rem; color: #4B5563;">
                         <div style="background: #FFFFFF; padding: 10px; border-radius: 6px; border: 1px solid #E5E7EB;">
                             <b>1. Global Baseline Anchor:</b><br>
-                            <code>$ {p_res.base_expected_value:.2f} / night</code><br>
+                            <code>${p_res.base_expected_value:.2f} / night</code><br>
                             <span style="font-size: 0.78rem; color: #6B7280;">Average price across all 1,200 training listings.</span>
                         </div>
                         <div style="background: #FFFFFF; padding: 10px; border-radius: 6px; border: 1px solid #E5E7EB;">
@@ -241,12 +276,12 @@ def render():
                         </div>
                         <div style="background: #FFFFFF; padding: 10px; border-radius: 6px; border: 1px solid #E5E7EB;">
                             <b>3. Nightly Revenue Gap:</b><br>
-                            <code>$ {p_res.predicted_fair_price_per_night:.2f} - $ {p_res.actual_price:.2f} = {gap:+.2f}</code><br>
+                            <code>${p_res.predicted_fair_price_per_night:.2f} - ${p_res.actual_price:.2f} = {gap:+.2f}</code><br>
                             <span style="font-size: 0.78rem; color: #6B7280;">Dollar difference between fair rate and actual rate.</span>
                         </div>
                         <div style="background: #FFFFFF; padding: 10px; border-radius: 6px; border: 1px solid #E5E7EB;">
                             <b>4. Monthly Uplift:</b><br>
-                            <code>$ {gap:.2f} × 15 nights = +${(gap * 15):,.2f}</code><br>
+                            <code>${gap:.2f} × 15 nights = +${(gap * 15):,.2f}</code><br>
                             <span style="font-size: 0.78rem; color: #6B7280;">Based on standard 50% occupancy (15 nights/month).</span>
                         </div>
                     </div>
@@ -307,8 +342,8 @@ def render():
                         <span style="font-size:1.1rem;">🛏️</span> <b>1. Private Room Capacity Mismatch</b><br>
                         <p style="font-size:0.83rem; color:#555; margin-top:6px;">
                             <b>65.5%</b> of underpriced listings were <code>Private room</code> categories. Hosts set low flat 
-                            rates ($46–$140), but offered capacity for 3 to 6 guests. The model correctly recognizes capacity value 
-                            (<code>ACCOMMODATES</code> SHAP pushes price up by +$75/nt).
+                            rates ($46–$140), but offered capacity for 3 to 6 guests. The model recognizes capacity value 
+                            and pushes the fair market price up accordingly.
                         </p>
                     </div>
                     """,
@@ -321,8 +356,7 @@ def render():
                         <span style="font-size:1.1rem;">☀️</span> <b>2. Seasonal Peak Inflexibility</b><br>
                         <p style="font-size:0.83rem; color:#555; margin-top:6px;">
                             <b>79.3%</b> of underpriced bookings checked in during <b>June (Month 6)</b>. 
-                            Cyclical sine/cosine features (<code>arrival_month_sin</code>) added summer surge demand, but hosts 
-                            failed to update winter/spring flat rates.
+                            Cyclical seasonal features added summer surge demand, but hosts failed to update winter/spring flat rates.
                         </p>
                     </div>
                     """,
@@ -343,7 +377,7 @@ def render():
                 )
 
             st.markdown("<br>", unsafe_allow_html=True)
-            st.caption("Artifact references: Generated SHAP summary plots are saved in `ml/artifacts/shap/` and tracked in MLflow Model Registry.")
+            st.caption("Market diagnostics evaluated against 300 chronological test listings.")
 
     # =========================================================================
     # 2. CANCELLATION RISK ASSESSOR TAB
