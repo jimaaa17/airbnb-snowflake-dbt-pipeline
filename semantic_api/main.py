@@ -236,7 +236,8 @@ def load_canonical_registry():
                 raise RuntimeError(f"Ratio metric '{m_name}' references undefined denominator '{den_ref}'.")
 
             # Ratio calculation logic resolved directly from YAML metadata specification
-            display_format = m.get("display_format") or type_params.get("display_format", "")
+            meta = (m.get("config", {}) or {}).get("meta", {}) if isinstance(m.get("config"), dict) else (m.get("meta") or {})
+            display_format = meta.get("display_format") or m.get("display_format") or type_params.get("display_format", "")
             if display_format == "percent":
                 sql_expr = f"ROUND({num_sql} * 100.0 / NULLIF({den_sql}, 0), 2)"
             else:
