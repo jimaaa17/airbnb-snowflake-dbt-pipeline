@@ -39,8 +39,8 @@ The predictive subsystem bridges historical Snowflake Gold Marts (`AIRBNB.gold.o
 
 ### Core Design Guarantees
 1. **Strict Train-Serve Parity**: All feature transformations are encapsulated in custom, serializable scikit-learn transformers (`AirbnbFeatureEngineer` in [`ml/features/transformers.py`](file:///Users/jimitnaik/Documents/Projects/Airbnb%20Snowflake%20DBT%20Pipeline/ml/features/transformers.py)) embedded directly into the persisted model pipeline. Both offline model training and real-time FastAPI endpoints (`/predict/price`, `/predict/cancellation`) execute identical code paths.
-2. **Zero Lookahead Leakage**: Temporal features and sliding-window aggregations strictly exclude observations occurring at or after the prediction timestamp ($t < \text{curr\_time}$).
-3. **Defensive Typing & Zero Div/0 Crashes**: Financial ratios and capacity metrics implement strict mathematical guards (masking non-positive totals, clipping ratios to $[0.0, 1.0]$, and tracking invalid data indicators).
+2. **Zero Lookahead Leakage**: Temporal features and sliding-window aggregations strictly exclude observations occurring at or after the prediction timestamp (`t < curr_time`).
+3. **Defensive Typing & Zero Div/0 Crashes**: Financial ratios and capacity metrics implement strict mathematical guards (masking non-positive totals, clipping ratios to `[0.0, 1.0]`, and tracking invalid data indicators).
 
 ---
 
@@ -51,15 +51,15 @@ Raw calendar numbers (such as month 12 and month 1) suffer from artificial numer
 
 | Feature Name | Type | Mathematical Formula / Derivation | Business Rationale & Guardrails |
 | :--- | :--- | :--- | :--- |
-| `arrival_month` | Float | $\text{month} \in [1, 12]$ (defaults to 6.0 if missing) | Base calendar month of check-in date. |
-| `arrival_month_sin` | Float | $\sin\left(\frac{2\pi \cdot (\text{month} - 1)}{12}\right)$ | Cyclical annual wave resolving the December ($m=12$) to January ($m=1$) circular continuity. |
-| `arrival_month_cos` | Float | $\cos\left(\frac{2\pi \cdot (\text{month} - 1)}{12}\right)$ | Orthogonal cyclical component completing the 2D annual seasonal circle. |
-| `arrival_dow` | Float | $\text{dow} \in [0, 6]$ (0 = Monday, 6 = Sunday) | Day of week index of check-in. |
-| `arrival_dow_sin` | Float | $\sin\left(\frac{2\pi \cdot \text{dow}}{7}\right)$ | Weekly cyclical cadence resolving Sunday ($6$) to Monday ($0$) transition. |
-| `arrival_dow_cos` | Float | $\cos\left(\frac{2\pi \cdot \text{dow}}{7}\right)$ | Orthogonal weekly cyclical component. |
-| `is_weekend_arrival`| Binary | $\mathbb{I}(\text{dow} \in \{4, 5\})$ | Flags Friday and Saturday check-ins isolating high-demand leisure vacation travel. |
-| `arrival_quarter` | Float | $\lceil \text{month} / 3 \rceil \in [1, 4]$ | Macro-quarter indicator for quarterly seasonal demand. |
-| `arrival_date_missing` | Binary | $\mathbb{I}(\text{arrival\_date is NaT})$ | Audit indicator tracking missing or corrupt reservation arrival dates. |
+| `arrival_month` | Float | `month ∈ [1, 12]` (defaults to 6.0 if missing) | Base calendar month of check-in date. |
+| `arrival_month_sin` | Float | `sin(2π * (month - 1) / 12)` | Cyclical annual wave resolving the December (m=12) to January (m=1) circular continuity. |
+| `arrival_month_cos` | Float | `cos(2π * (month - 1) / 12)` | Orthogonal cyclical component completing the 2D annual seasonal circle. |
+| `arrival_dow` | Float | `dow ∈ [0, 6]` (0 = Monday, 6 = Sunday) | Day of week index of check-in. |
+| `arrival_dow_sin` | Float | `sin(2π * dow / 7)` | Weekly cyclical cadence resolving Sunday (6) to Monday (0) transition. |
+| `arrival_dow_cos` | Float | `cos(2π * dow / 7)` | Orthogonal weekly cyclical component. |
+| `is_weekend_arrival`| Binary | `1 if dow in [4, 5] else 0` | Flags Friday and Saturday check-ins isolating high-demand leisure vacation travel. |
+| `arrival_quarter` | Float | `ceil(month / 3) ∈ [1, 4]` | Macro-quarter indicator for quarterly seasonal demand. |
+| `arrival_date_missing` | Binary | `1 if arrival_date is NaT else 0` | Audit indicator tracking missing or corrupt reservation arrival dates. |
 
 ---
 
@@ -68,13 +68,13 @@ Lead time (the gap between reservation creation and check-in) is the single stro
 
 | Feature Name | Type | Mathematical Formula / Derivation | Business Rationale & Guardrails |
 | :--- | :--- | :--- | :--- |
-| `lead_time_days` | Float | $\text{clip}\left(\lfloor \text{date}_{\text{arr}} - \text{date}_{\text{creat}} \rfloor, 0, 730\right)$ | Midnight calendar-normalized day delta clipped to $[0, 730]$. Eliminates Python `timedelta` sub-day negative floor-division integer bugs. |
-| `lead_time_log` | Float | $\ln(1 + \text{lead\_time\_days})$ | Variance-stabilizing natural logarithmic transformation dampening extreme right-skewed reservations. |
-| `is_last_minute` | Binary | $\mathbb{I}(\text{lead\_time\_days} \le 3)$ | Flags urgent reservations with near-zero cancellation likelihood. |
-| `is_short_notice`| Binary | $\mathbb{I}(3 < \text{lead\_time\_days} \le 7)$ | Flags short-window bookings (4 to 7 days advance). |
-| `is_far_advance` | Binary | $\mathbb{I}(\text{lead\_time\_days} \ge 45)$ | Flags long-horizon reservations exhibiting highest cancellation vulnerability. |
-| `lead_time_missing` | Binary | $\mathbb{I}(\text{lead\_time is NaT})$ | Audit indicator identifying reservations lacking creation or arrival timestamps. |
-| `lead_time_invalid` | Binary | $\mathbb{I}(\text{date}_{\text{arr}} < \text{date}_{\text{creat}})$ | Audit flag isolating retroactive or corrupted timestamps. |
+| `lead_time_days` | Float | `clip(date_arr - date_creat, 0, 730)` | Midnight calendar-normalized day delta clipped to `[0, 730]`. Eliminates Python `timedelta` sub-day negative floor-division integer bugs. |
+| `lead_time_log` | Float | `ln(1 + lead_time_days)` | Variance-stabilizing natural logarithmic transformation dampening extreme right-skewed reservations. |
+| `is_last_minute` | Binary | `1 if lead_time_days <= 3 else 0` | Flags urgent reservations with near-zero cancellation likelihood. |
+| `is_short_notice`| Binary | `1 if 3 < lead_time_days <= 7 else 0` | Flags short-window bookings (4 to 7 days advance). |
+| `is_far_advance` | Binary | `1 if lead_time_days >= 45 else 0` | Flags long-horizon reservations exhibiting highest cancellation vulnerability. |
+| `lead_time_missing` | Binary | `1 if lead_time is NaT else 0` | Audit indicator identifying reservations lacking creation or arrival timestamps. |
+| `lead_time_invalid` | Binary | `1 if date_arr < date_creat else 0` | Audit flag isolating retroactive or corrupted timestamps. |
 
 ---
 
@@ -83,9 +83,9 @@ Absolute dollar fees (cleaning and service fees) vary widely by property size; r
 
 | Feature Name | Type | Mathematical Formula / Derivation | Business Rationale & Guardrails |
 | :--- | :--- | :--- | :--- |
-| `cleaning_fee_ratio` | Float | $\text{clip}\left(\frac{\text{CLEANING\_FEE}}{\text{TOTAL\_AMOUNT}}, 0.0, 1.0\right)$ | Proportion of total booking bill attributable to cleaning costs. Division by non-positive total masked to NaN $\rightarrow$ 0.0. |
-| `service_fee_ratio` | Float | $\text{clip}\left(\frac{\text{SERVICE\_FEE}}{\text{TOTAL\_AMOUNT}}, 0.0, 1.0\right)$ | Proportion of total booking bill attributable to Airbnb service fee. Bounded in $[0.0, 1.0]$. |
-| `total_amount_invalid` | Binary | $\mathbb{I}(\text{TOTAL\_AMOUNT} \le 0 \lor \text{is NaN})$ | Defensive audit indicator preventing mathematical inversion or divide-by-zero crashes. |
+| `cleaning_fee_ratio` | Float | `clip(CLEANING_FEE / TOTAL_AMOUNT, 0.0, 1.0)` | Proportion of total booking bill attributable to cleaning costs. Division by non-positive total masked to NaN → 0.0. |
+| `service_fee_ratio` | Float | `clip(SERVICE_FEE / TOTAL_AMOUNT, 0.0, 1.0)` | Proportion of total booking bill attributable to Airbnb service fee. Bounded in `[0.0, 1.0]`. |
+| `total_amount_invalid` | Binary | `1 if TOTAL_AMOUNT <= 0 or is NaN else 0` | Defensive audit indicator preventing mathematical inversion or divide-by-zero crashes. |
 
 ---
 
@@ -94,11 +94,11 @@ Captures property density, space per guest, and fee burdens normalized by physic
 
 | Feature Name | Type | Mathematical Formula / Derivation | Business Rationale & Guardrails |
 | :--- | :--- | :--- | :--- |
-| `bedroom_to_accommodates_ratio` | Float | $\text{clip}\left(\frac{\text{BEDROOMS}}{\text{ACCOMMODATES}}, 0.0, 2.0\right)$ | Measures privacy density (defaults to 0.5 if missing). Bounded to prevent distortion from outlier studio configs. |
-| `cleaning_fee_per_bedroom` | Float | $\frac{\text{CLEANING\_FEE}}{\max(1, \text{BEDROOMS})}$ | Unit cleaning fee per bedroom. |
-| `cleaning_fee_per_accommodate` | Float | $\frac{\text{CLEANING\_FEE}}{\max(1, \text{ACCOMMODATES})}$ | Unit cleaning fee per guest capacity. |
-| `price_per_accommodate` | Float | $\frac{\text{PRICE\_PER\_NIGHT}}{\max(1, \text{ACCOMMODATES})}$ | **Strictly isolated to Cancellation Classifier**. Banned from Price Regressor to eliminate direct target leakage. |
-| `accommodates_invalid` | Binary | $\mathbb{I}(\text{ACCOMMODATES} \le 0 \lor \text{is NaN})$ | Data quality indicator flagging uninitialized capacity metadata. |
+| `bedroom_to_accommodates_ratio` | Float | `clip(BEDROOMS / ACCOMMODATES, 0.0, 2.0)` | Measures privacy density (defaults to 0.5 if missing). Bounded to prevent distortion from outlier studio configs. |
+| `cleaning_fee_per_bedroom` | Float | `CLEANING_FEE / max(1, BEDROOMS)` | Unit cleaning fee per bedroom. |
+| `cleaning_fee_per_accommodate` | Float | `CLEANING_FEE / max(1, ACCOMMODATES)` | Unit cleaning fee per guest capacity. |
+| `price_per_accommodate` | Float | `PRICE_PER_NIGHT / max(1, ACCOMMODATES)` | **Strictly isolated to Cancellation Classifier**. Banned from Price Regressor to eliminate direct target leakage. |
+| `accommodates_invalid` | Binary | `1 if ACCOMMODATES <= 0 or is NaN else 0` | Data quality indicator flagging uninitialized capacity metadata. |
 
 ---
 
@@ -107,22 +107,24 @@ Encodes host responsiveness and verified Superhost badges.
 
 | Feature Name | Type | Mathematical Formula / Derivation | Business Rationale & Guardrails |
 | :--- | :--- | :--- | :--- |
-| `is_superhost_binary` | Binary | $\mathbb{I}(\text{IS\_SUPERHOST} \in \{\text{'true'}, \text{'t'}, \text{'1'}, \text{'yes'}\})$ | Robust case-insensitive string parsing converting diverse boolean formats to 0 or 1. |
-| `host_response_rate` | Float | $\text{parse\_pct}(\text{RESPONSE\_RATE}) \in [0.0, 100.0]$ | Strips whitespace and trailing `%` symbols; imputes missing records to median baseline ($80.0\%$). |
-| `response_rate_missing`| Binary | $\mathbb{I}(\text{RESPONSE\_RATE is NaN})$ | Audit indicator flagging hosts without public response rate telemetry. |
+| `is_superhost_binary` | Binary | `1 if IS_SUPERHOST in ['true', 't', '1', 'yes'] else 0` | Robust case-insensitive string parsing converting diverse boolean formats to 0 or 1. |
+| `host_response_rate` | Float | `parse_pct(RESPONSE_RATE) ∈ [0.0, 100.0]` | Strips whitespace and trailing `%` symbols; imputes missing records to median baseline (80.0%). |
+| `response_rate_missing`| Binary | `1 if RESPONSE_RATE is NaN else 0` | Audit indicator flagging hosts without public response rate telemetry. |
 
 ---
 
 ### 2.6 Zipline Point-in-Time Sliding Window Features
 Implemented in [`ml/features/feature_store.py`](file:///Users/jimitnaik/Documents/Projects/Airbnb%20Snowflake%20DBT%20Pipeline/ml/features/feature_store.py), these features simulate an enterprise point-in-time feature store (Zipline pattern), computing listing behavioral velocity prior to reservation timestamp:
 
-$$\text{Window}(t) = \left\{\tau \mid t - 30\text{ days} \le \tau < t\right\}$$
+```text
+Window(t) = [t - 30 days, t)    (strictly prior to current observation timestamp)
+```
 
 | Feature Name | Type | Derivation | Leakage Prevention Rule |
 | :--- | :--- | :--- | :--- |
-| `trailing_30d_listing_bookings` | Integer | $\sum_{\tau \in \text{Window}} 1$ | Sum of bookings on the listing strictly prior to current reservation creation. |
-| `trailing_30d_listing_cancellations` | Integer | $\sum_{\tau \in \text{Window}} \mathbb{I}(\text{status} = \text{'cancelled'})$ | Sum of cancellations on the listing strictly prior to current reservation creation. |
-| `trailing_30d_cancellation_rate` | Float | $\frac{\text{trailing\_30d\_cancellations}}{\max(1, \text{trailing\_30d\_bookings})}$ | Point-in-time listing cancellation propensity (defaults to 0.0 if zero bookings). |
+| `trailing_30d_listing_bookings` | Integer | `count(bookings in Window)` | Sum of bookings on the listing strictly prior to current reservation creation. |
+| `trailing_30d_listing_cancellations` | Integer | `count(cancellations in Window)` | Sum of cancellations on the listing strictly prior to current reservation creation. |
+| `trailing_30d_cancellation_rate` | Float | `trailing_30d_cancellations / max(1, trailing_30d_bookings)` | Point-in-time listing cancellation propensity (defaults to 0.0 if zero bookings). |
 
 ---
 
@@ -152,7 +154,7 @@ The preprocessor is structured as a `ColumnTransformer` executing distinct sciki
 
 The feature engineering subsystem is thoroughly verified via continuous automated unit tests in [`ml/tests/test_ml_pipeline.py`](file:///Users/jimitnaik/Documents/Projects/Airbnb%20Snowflake%20DBT%20Pipeline/ml/tests/test_ml_pipeline.py):
 
-* `test_feature_engineer_transformation`: Verifies shape, non-null guarantees, and trigonometric ranges $[-1.0, 1.0]$.
+* `test_feature_engineer_transformation`: Verifies shape, non-null guarantees, and trigonometric ranges `[-1.0, 1.0]`.
 * `test_lead_time_edge_cases`: Verifies sub-day truncation protections, negative retroactive booking flags, and missing date coercion.
 * `test_calendar_seasonality_features_edge_cases`: Validates cyclical boundary continuity across New Year transitions.
 * `test_zipline_feature_store_no_lookahead`: Strictly asserts that future booking events do not contaminate past point-in-time calculation windows.

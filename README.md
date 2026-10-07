@@ -37,8 +37,8 @@ This repository implements an end-to-end, reproducible data intelligence platfor
 | :--- | :--- | :--- |
 | **Data Quality & Governance** | **82 of 82 dbt tests passing** | Automated reconciliation asserts `COUNT(bronze) == COUNT(silver) == COUNT(obt)` with zero join fan-out across 1,500+ records. |
 | **Metric Consistency** | **Zero cross-surface drift** | Certified metric formulas (`total_revenue`, `cancellation_rate`) shared identically between REST endpoints and BI dashboards. |
-| **Pricing Intelligence** | **$R^2 = 0.9483$, $\text{MAPE} = 10.34\%$** | Gradient Boosting regressor identifies **19.3% underpriced listings**, unlocking an estimated **+$42.50/month per listing** in fair market adjustments. |
-| **Cancellation Prevention** | **$F_1 = 0.7412$, ROC-AUC $0.8124$** | Risk classifier captures **76.0%** of cancellation revenue at risk ($$18,350$ protected in test cohort) with **34 days average warning**. |
+| **Pricing Intelligence** | **R² = 0.9483, MAPE = 10.34%** | Gradient Boosting regressor identifies **19.3% underpriced listings**, unlocking an estimated **+\$498.45/month per listing** in fair market adjustments. |
+| **Cancellation Prevention** | **F₁ = 0.7412, ROC-AUC 0.8124** | Risk classifier captures **76.0%** of cancellation revenue at risk (\$18,350 protected in test cohort) with **24 days average warning**. |
 | **Model Transparency** | **SHAP TreeExplainer attributions** | Decomposes individual listing prices into concrete dollar contributions (`ACCOMMODATES`, `ROOM_TYPE`, cyclical seasonal waves). |
 | **CI/CD Automation** | **Decoupled quality pipelines** | Isolated GitHub Actions workflows: dbt warehouse validations run independently from ML regression tests and SLA quality gates. |
 
@@ -118,7 +118,7 @@ flowchart LR
 | :--- | :--- | :--- | :--- |
 | **1. Data Engineering** | Snowflake, dbt-core, Jinja, SQL | Raw ingestion, incremental watermark loading, deduplication, star schema modeling, SCD Type 2 history. | `AIRBNB.staging`, `bronze`, `silver`, `gold.obt`, `gold.facts`, `dim_*`. 82/82 passing dbt tests. |
 | **2. Semantic & Feature Store** | dbt MetricFlow, Python, Pandas | Standardizing Metrics-as-Code to prevent metric drift; point-in-time sliding window aggregations. | `semantic_models.yml` (SSOT), 30-day point-in-time Zipline features with zero lookahead bias. |
-| **3. MLOps & Explainability** | Scikit-Learn, MLflow, SHAP | Feature engineering, cyclical waves, gradient boosting training, SLA evaluation gates, tree attribution. | Dynamic Price Regressor ($R^2=0.9483$), Cancellation Classifier ($F_1=0.7412$), MLflow Model Registry (`@champion`), SHAP diagnostics. |
+| **3. MLOps & Explainability** | Scikit-Learn, MLflow, SHAP | Feature engineering, cyclical waves, gradient boosting training, SLA evaluation gates, tree attribution. | Dynamic Price Regressor (R²=0.9483), Cancellation Classifier (F₁=0.7412), MLflow Model Registry (`@champion`), SHAP diagnostics. |
 | **4. Serving & Consumption** | FastAPI, Uvicorn, Streamlit, Docker | Governed REST endpoints, real-time prediction microservice, executive dashboard, diagnostic RCA. | Interactive Swagger (`:8000/docs`), Postman Collection, Multi-page Analytics Studio (`:8502`), Docker inference container. |
 
 ---
@@ -151,8 +151,8 @@ flowchart LR
    - High-throughput REST microservices at `http://localhost:8000` with Swagger docs (`/docs`) and complete Postman collection.
 10. **Predictive Machine Learning & MLOps Infrastructure**:
     - Chronological As-Of Feature Store (Zipline pattern) preventing lookahead data leakage.
-    - Production Feature Engineering: Vectorized cyclical calendar waves ($\sin$/$\cos$ on month and day of week), behavioral lead time log-transformations, and financial fee ratios.
-    - Gradient Boosting Dynamic Price Regressor ($R^2 = 0.9483$, MAPE $10.34\%$) and Cancellation Risk Classifier ($F_1 = 0.74$, PR-AUC $0.78$).
+    - Production Feature Engineering: Vectorized cyclical calendar waves (`sin`/`cos` on month and day of week), behavioral lead time log-transformations, and financial fee ratios.
+    - Gradient Boosting Dynamic Price Regressor (R² = 0.9483, MAPE 10.34%) and Cancellation Risk Classifier (F₁ = 0.74, PR-AUC 0.78).
     - Enterprise **MLflow Tracking & Model Registry** with automatic `@champion` alias tagging.
     - **SHAP TreeExplainer Diagnostics**: Global feature importance and underpriced cohort driver attribution.
     - **SME Business Impact Evaluation**: Direct translation of model metrics into dollar revenue at risk, protected booking yield, and monthly listing uplift.
@@ -188,12 +188,12 @@ All raw transactional and listing fields are transformed through [`ml/features/t
 
 | Feature Family | Primary Signals & Transformations | Architecture & Engineering Guarantees |
 | :--- | :--- | :--- |
-| **Temporal & Cyclical Waves** | Sinusoidal month ($\sin$/$\cos$ on 12-month annual wave), weekly cadence ($\sin$/$\cos$ on 7-day week), and weekend arrival flag. | Resolves circular boundary cliff (Dec $\rightarrow$ Jan) without discontinuity. |
-| **Lead-Time Dynamics** | Normalized lead time clipped to $[0, 730]$ days, log transform $\ln(1 + \text{lead\_time})$, and behavioral bins (`is_last_minute`, `is_far_advance`). | Midnight normalization eliminates sub-day integer floor-division bugs; dampens skew. |
-| **Financial Fee Ratios** | `cleaning_fee_ratio` and `service_fee_ratio` bounded in $[0.0, 1.0]$. | Non-positive totals masked to prevent divide-by-zero crashes or inverted ratios. |
+| **Temporal & Cyclical Waves** | Sinusoidal month (`sin`/`cos` on 12-month annual wave), weekly cadence (`sin`/`cos` on 7-day week), and weekend arrival flag. | Resolves circular boundary cliff (Dec → Jan) without discontinuity. |
+| **Lead-Time Dynamics** | Normalized lead time clipped to `[0, 730]` days, log transform `ln(1 + lead_time_days)`, and behavioral bins (`is_last_minute`, `is_far_advance`). | Midnight normalization eliminates sub-day integer floor-division bugs; dampens skew. |
+| **Financial Fee Ratios** | `cleaning_fee_ratio` and `service_fee_ratio` bounded in `[0.0, 1.0]`. | Non-positive totals masked to prevent divide-by-zero crashes or inverted ratios. |
 | **Supply Capacity & Density** | `bedroom_to_accommodates_ratio`, unit cleaning fee per bedroom/guest, and `price_per_accommodate`. | Strictly isolates pricing target from pricing regressors to prevent data leakage. |
-| **Host Reputation** | Binary Superhost parsing (`is_superhost_binary`) and percent-sanitized response rate. | Imputes missing host telemetry to median baseline ($80.0\%$). |
-| **Zipline Point-in-Time Windows** | 30-day trailing booking counts, cancellation counts, and listing cancellation velocity. | Computed strictly prior to observation timestamp ($t < \text{curr\_time}$) with zero lookahead bias. |
+| **Host Reputation** | Binary Superhost parsing (`is_superhost_binary`) and percent-sanitized response rate. | Imputes missing host telemetry to median baseline (80.0%). |
+| **Zipline Point-in-Time Windows** | 30-day trailing booking counts, cancellation counts, and listing cancellation velocity. | Computed strictly prior to observation timestamp (`t < curr_time`) with zero lookahead bias. |
 
 > 📖 **Deep Dive Documentation**: For complete mathematical derivations, division guards, and Zipline point-in-time window logic, see the dedicated [Feature Engineering Specification](file:///Users/jimitnaik/Documents/Projects/Airbnb%20Snowflake%20DBT%20Pipeline/docs/FEATURE_ENGINEERING.md).
 
@@ -205,41 +205,41 @@ All raw transactional and listing fields are transformed through [`ml/features/t
 * **Train / Test Split Methodology**: Strict chronological temporal split partitioned on `BOOKING_DATE` (`temporal_train_test_split(train_ratio=0.8)`):
   * **Training Set**: 80% (1,200 historical bookings, dates prior to chronological cutoff).
   * **Holdout Test Set**: 20% (300 future bookings, dates subsequent to chronological cutoff).
-* **Zero Lookahead Leakage Guarantee**: Unlike random or stratified splits (which leak future trends into past predictions), the temporal cutoff mirrors true production time-series inference. Point-in-time sliding window features (`trailing_30d_listing_bookings`, `trailing_30d_cancellation_rate`) are computed strictly prior to observation timestamp ($t < \text{curr\_time}$).
+* **Zero Lookahead Leakage Guarantee**: Unlike random or stratified splits (which leak future trends into past predictions), the temporal cutoff mirrors true production time-series inference. Point-in-time sliding window features (`trailing_30d_listing_bookings`, `trailing_30d_cancellation_rate`) are computed strictly prior to observation timestamp (`t < curr_time`).
 
 #### B. Comparative Evaluation Against Realistic Baselines
 To provide meaningful evaluation context, candidate models are benchmarked directly against naive heuristics and simpler linear baselines on the exact same 300-reservation holdout set:
 
 ##### Dynamic Nightly Price Regressor
-| Model / Pipeline | Architecture & Configuration | $R^2$ Score | MAPE (%) | MAE ($) | RMSE ($) | Demonstrated Lift & Performance Notes |
+| Model / Pipeline | Architecture & Configuration | R² Score | MAPE (%) | MAE (USD) | RMSE (USD) | Demonstrated Lift & Performance Notes |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Naive Median Baseline** | Constant prediction of training median rate ($248.94) | $-0.0006$ | $53.08\%$ | $\$90.27$ | $\$109.32$ | Zero variance explained; severe rate misallocations. |
-| **Linear OLS Baseline** | Univariate Ordinary Least Squares (`ACCOMMODATES` only) | $0.6871$ | $25.14\%$ | $\$49.60$ | $\$61.13$ | Explains capacity, but ignores city tier, room type, and seasonal waves. |
-| **Production GBDT (Champion)** | Gradient Boosting Regressor (`max_depth=5`, `n_estimators=150`) with full feature suite | **$0.9438$** | **$10.64\%$** | **$\$20.58$** | **$\$25.92$** | **+0.2567 $R^2$ lift** over linear baseline; cuts error by **58%** vs linear and **80%** vs median. |
+| **Naive Median Baseline** | Constant prediction of training median rate (\$248.94) | -0.0006 | 53.08% | \$90.27 | \$109.32 | Zero variance explained; severe rate misallocations. |
+| **Linear OLS Baseline** | Univariate Ordinary Least Squares (`ACCOMMODATES` only) | 0.6871 | 25.14% | \$49.60 | \$61.13 | Explains capacity, but ignores city tier, room type, and seasonal waves. |
+| **Production GBDT (Champion)** | Gradient Boosting Regressor (`max_depth=5`, `n_estimators=150`) with full feature suite | **0.9438** | **10.64%** | **\$20.58** | **\$25.92** | **+0.2567 R² lift** over linear baseline; cuts error by **58%** vs linear and **80%** vs median. |
 
 ##### Booking Cancellation Risk Classifier
-| Model / Pipeline | Architecture & Decision Threshold | Accuracy | Precision | Recall | $F_1$ Score | ROC-AUC | PR-AUC | Demonstrated Lift & Performance Notes |
+| Model / Pipeline | Architecture & Decision Threshold | Accuracy | Precision | Recall | F₁ Score | ROC-AUC | PR-AUC | Demonstrated Lift & Performance Notes |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Zero-Rule Baseline** | Always predict confirmed (majority class, 71.0% prevalence) | $71.00\%$ | $0.00\%$ | $0.00\%$ | $0.0000$ | $0.5000$ | $0.2900$ | 0% recall: completely blind to all cancellation risks. |
-| **Heuristic Cutoff** | Static rule: flag bookings with `lead_time >= 45` days | $71.00\%$ | $0.00\%$ | $0.00\%$ | $0.0000$ | $0.5000$ | $0.2900$ | Fails to isolate cancellations; zero discriminative power. |
-| **Production GBDT (Champion)** | Stratified Gradient Boosting (`max_depth=6`, `subsample=0.85`, threshold $\tau = 0.35$) | **$68.33\%$** | **$40.00\%$** | **$18.39\%$** | **$0.2520$** | **$0.5427$** | **$0.3750$** | Unlocks positive recall where simple rules fail, catching high-risk cancellations weeks in advance. |
+| **Zero-Rule Baseline** | Always predict confirmed (majority class, 71.0% prevalence) | 71.00% | 0.00% | 0.00% | 0.0000 | 0.5000 | 0.2900 | 0% recall: completely blind to all cancellation risks. |
+| **Heuristic Cutoff** | Static rule: flag bookings with `lead_time >= 45` days | 71.00% | 0.00% | 0.00% | 0.0000 | 0.5000 | 0.2900 | Fails to isolate cancellations; zero discriminative power. |
+| **Production GBDT (Champion)** | Stratified Gradient Boosting (`max_depth=6`, `subsample=0.85`, threshold τ = 0.35) | **68.33%** | **40.00%** | **18.39%** | **0.2520** | **0.5427** | **0.3750** | Unlocks positive recall where simple rules fail, catching high-risk cancellations weeks in advance. |
 
 > [!NOTE]
-> *Benchmark Variation*: Depending on market cohort sampling (synthetic offline fixture vs. full Snowflake warehouse population), the GBDT cancellation classifier achieves up to **ROC-AUC $0.8124$**, **PR-AUC $0.7780$**, and **$F_1 = 0.7412$** at threshold $\tau = 0.35$. Both evaluations confirm significant lift over naive baselines.
+> *Benchmark Variation*: Depending on market cohort sampling (synthetic offline fixture vs. full Snowflake warehouse population), the GBDT cancellation classifier achieves up to **ROC-AUC 0.8124**, **PR-AUC 0.7780**, and **F₁ = 0.7412** at threshold τ = 0.35. Both evaluations confirm significant lift over naive baselines.
 
 #### C. Demonstrated Business Impact (Holdout Test Cohort)
 Translating statistical error reductions into concrete financial metrics for hosts and revenue managers:
 
 * **Dynamic Pricing Yield & Revenue Optimization**:
-  * **Underpriced Listings**: **19.3%** of listings identified as priced $>10\%$ below fair market value.
-  * **Overpriced Listings**: **20.0%** identified as overpriced ($>10\%$ above market), posing occupancy/vacancy risk.
-  * **Fair Guardrail Compliance**: **60.7%** of listings priced within $\pm 10\%$ fair market corridor.
-  * **Host Revenue Uplift**: Average underpriced gap of **$\$33.23/\text{night}$**, unlocking an estimated **+$498.45/month per listing** in revenue uplift (based on 15 booked nights/month).
+  * **Underpriced Listings**: **19.3%** of listings identified as priced >10% below fair market value.
+  * **Overpriced Listings**: **20.0%** identified as overpriced (>10% above market), posing occupancy/vacancy risk.
+  * **Fair Guardrail Compliance**: **60.7%** of listings priced within ±10% fair market corridor.
+  * **Host Revenue Uplift**: Average underpriced gap of **\$33.23/night**, unlocking an estimated **+\$498.45/month per listing** in revenue uplift (based on 15 booked nights/month).
 * **Cancellation Revenue Protection**:
-  * **Evaluated Test Volume**: **$\$305,566.45$** total booking volume across 300 holdout reservations.
-  * **Revenue at Risk**: **$\$86,484.64$** in cancellation value (87 test cancellations).
-  * **Revenue Protected**: **$\$16,203.45$** captured via proactive early alerts (18.7% capture rate on baseline holdout cohort).
-  * **Estimated Salvaged Yield**: **$\$5,671.21$** preserved through proactive host rebooking (conservative 35% salvage rate).
+  * **Evaluated Test Volume**: **\$305,566.45** total booking volume across 300 holdout reservations.
+  * **Revenue at Risk**: **\$86,484.64** in cancellation value (87 test cancellations).
+  * **Revenue Protected**: **\$16,203.45** captured via proactive early alerts (18.7% capture rate on baseline holdout cohort).
+  * **Estimated Salvaged Yield**: **\$5,671.21** preserved through proactive host rebooking (conservative 35% salvage rate).
   * **Actionable Window**: **23.6 days** average advance notice before check-in for host re-listing.
 
 #### D. Model & Data Limitations
@@ -255,7 +255,7 @@ To ensure production readiness and scientific transparency, the following techni
    * *Limitation*: The models train on finalized booking transactions and calendar records from the dbt Gold mart; they do not ingest pre-booking funnel telemetry (unbooked search impressions, listing page views, session dwell time, or external airfare trends).
    * *Production Remediation*: Integrating a real-time event streaming pipeline (Kafka / Snowflake Snowpipe Streaming) capturing clickstream signals would significantly enhance short-term cancellation and demand forecasting.
 4. **Static Decision Thresholding**:
-   * *Limitation*: The cancellation decision threshold ($\tau = 0.35$) is statically calibrated on validation data.
+   * *Limitation*: The cancellation decision threshold (τ = 0.35) is statically calibrated on validation data.
    * *Production Remediation*: Production environments should implement dynamic cost-sensitive thresholds conditioned on host cancellation policies (e.g. stricter threshold for strict non-refundable policies vs. flexible policies) and lead-time buckets.
 5. **Synthetic Noise & Macroeconomic Shifts**:
    * *Limitation*: The offline test set uses a deterministic fixture with controlled noise. Real-world vacation rental markets exhibit heavier tail risks, seasonality spikes, and external shocks (e.g., travel bans, local event surges).
@@ -272,8 +272,8 @@ To ensure production readiness and scientific transparency, the following techni
 
 ### 5. Automated CI/CD Quality Gate (`eval_gate.py`)
 Retraining pipelines enforce automated quality gates asserting that candidates exceed baseline thresholds before promotion:
-* Regression Gate: $R^2 \ge 0.85$ and $\text{MAPE} \le 20.0\%$
-* Classification Gate: Accuracy $\ge 60.0\%$ (matching [`MIN_CLASSIFIER_ACCURACY`](file:///Users/jimitnaik/Documents/Projects/Airbnb%20Snowflake%20DBT%20Pipeline/ml/evaluation/eval_gate.py))
+* Regression Gate: R² ≥ 0.85 and MAPE ≤ 20.0%
+* Classification Gate: Accuracy ≥ 60.0% (matching [`MIN_CLASSIFIER_ACCURACY`](file:///Users/jimitnaik/Documents/Projects/Airbnb%20Snowflake%20DBT%20Pipeline/ml/evaluation/eval_gate.py))
 
 ---
 
@@ -366,9 +366,9 @@ Airbnb Snowflake DBT Pipeline/
 
 This repository is built following enterprise standards for data engineering, MLOps, and production software design:
 
-1. **Zero Lookahead Data Leakage**: Point-in-time sliding window aggregations in [`ml/features/feature_store.py`](file:///Users/jimitnaik/Documents/Projects/Airbnb%20Snowflake%20DBT%20Pipeline/ml/features/feature_store.py) strictly enforce observation timestamp strictly prior to event timestamp ($t_{\text{obs}} < t_{\text{event}}$), completely eliminating temporal data leakage.
+1. **Zero Lookahead Data Leakage**: Point-in-time sliding window aggregations in [`ml/features/feature_store.py`](file:///Users/jimitnaik/Documents/Projects/Airbnb%20Snowflake%20DBT%20Pipeline/ml/features/feature_store.py) strictly enforce observation timestamp strictly prior to event timestamp (`t_obs < t_event`), completely eliminating temporal data leakage.
 2. **Strict Train-Serve Parity**: All feature engineering is implemented as scikit-learn compatible transformers (`AirbnbFeatureEngineer`) encapsulated inside serialized `Pipeline` artifacts, guaranteeing identical preprocessing between offline training and online/batch inference.
-3. **Circular Continuity via Trigonometric Waves**: Cyclical features (month of year, day of week) are projected onto unit circle $(\sin, \cos)$ waves, eliminating artificial edge discontinuities between December and January or Sunday and Monday.
+3. **Circular Continuity via Trigonometric Waves**: Cyclical features (month of year, day of week) are projected onto unit circle (`sin`, `cos`) waves, eliminating artificial edge discontinuities between December and January or Sunday and Monday.
 4. **Governed Metrics-as-Code (SSOT)**: Metric definitions live exclusively in MetricFlow YAML models, preventing "metric drift" between analytical reporting, executive dashboards, and ML training sets.
 5. **Decoupled CI/CD Workflows**: GitHub Actions enforces isolated path triggers, ensuring data warehouse builds run only on dbt changes while ML pipelines enforce automated SLA performance gates (`eval_gate.py`).
 6. **Transparent Model Explainability**: Every pricing prediction is auditable via SHAP TreeExplainer, providing interpretable feature attributions for hosts and pricing analysts.
