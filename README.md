@@ -1,67 +1,93 @@
-# 🏡 Airbnb Snowflake dbt Pipeline & Semantic Intelligence Platform
-
-An enterprise-grade, end-to-end data transformation, semantic layer, and predictive intelligence platform for Airbnb data on Snowflake. Built using **dbt Medallion Architecture**, **dbt Semantic Layer / MetricFlow**, **FastAPI Semantic Gateway**, **Scikit-Learn ML Pipelines**, and **Airbnb Analytics Studio (Streamlit)**.
+<p align="center">
+  <img src="apps/assets/airbnb_logo.svg" alt="Airbnb Logo" width="80" />
+  <h1 align="center">Airbnb Snowflake dbt Pipeline & Semantic Intelligence Platform</h1>
+  <p align="center">
+    <strong>Enterprise Medallion Data Engineering • MetricFlow Semantic Layer • MLOps & Model Registry • Real-Time Serving</strong>
+  </p>
+  <p align="center">
+    <a href="https://github.com/jimaaa17/airbnb-snowflake-dbt-pipeline/actions/workflows/dbt_ci_cd.yml"><img src="https://img.shields.io/github/actions/workflow/status/jimaaa17/airbnb-snowflake-dbt-pipeline/dbt_ci_cd.yml?label=dbt%20CI%2FCD&style=flat-square&logo=dbt" alt="dbt CI/CD"></a>
+    <a href="https://github.com/jimaaa17/airbnb-snowflake-dbt-pipeline/actions/workflows/ml_and_apps_ci_cd.yml"><img src="https://img.shields.io/github/actions/workflow/status/jimaaa17/airbnb-snowflake-dbt-pipeline/ml_and_apps_ci_cd.yml?label=ML%20%26%20Apps%20CI%2FCD&style=flat-square&logo=githubactions" alt="ML CI/CD"></a>
+    <img src="https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.12">
+    <img src="https://img.shields.io/badge/Snowflake-Data%20Cloud-29B5E8?style=flat-square&logo=snowflake&logoColor=white" alt="Snowflake">
+    <img src="https://img.shields.io/badge/MLflow-Registry-0194E2?style=flat-square&logo=mlflow&logoColor=white" alt="MLflow">
+    <img src="https://img.shields.io/badge/FastAPI-Gateway-009688?style=flat-square&logo=fastapi&logoColor=white" alt="FastAPI">
+    <img src="https://img.shields.io/badge/Streamlit-Studio-FF4B4B?style=flat-square&logo=streamlit&logoColor=white" alt="Streamlit">
+    <img src="https://img.shields.io/badge/uv-Package%20Manager-DE5FE9?style=flat-square" alt="uv">
+  </p>
+</p>
 
 ---
 
 ## 📌 Project Overview
 
-This platform transforms raw marketplace event streams from **AWS S3** into certified **Snowflake** data marts, provides governed **Metrics-as-Code**, and serves real-time predictive microservices and executive decision workflows:
-
-```text
-AWS S3 ──► Snowflake Staging ──► Bronze Layer ──► Silver Layer ──► Gold Layer (OBT & SCD2)
-                                                                           │
-                                                                           ▼
-                                                             dbt Semantic Layer (MetricFlow)
-                                                                           │
-                                       ┌───────────────────────────────────┴───────────────────────────────────┐
-                                       ▼                                                                       ▼
-                         FastAPI Semantic Gateway (:8000)                                   Airbnb Analytics Studio (:8502)
-                         • REST Endpoints & Postman Suite                                   • Executive Overview & KPIs
-                         • Governed Dynamic SQL Execution                                   • Diagnostic RCA & A/B Engine
-                         • Point-in-Time ML Feature Serving                                 • Predictive Dynamic Pricing & ML
-                                                                                            • Self-Service Explorer & Catalog
-```
-
-- **Source Ingestion (`AIRBNB.staging`)**: Raw tables loaded from AWS S3 (`listings`, `bookings`, `hosts`) via external stage `COPY INTO`.
-- **Bronze Layer (`AIRBNB.bronze`)**: Incremental 1-to-1 schema casting with `CREATED_AT` watermark filtering.
-- **Silver Layer (`AIRBNB.silver`)**: Enriched, standardized models utilizing macros (`multiply`, `tag`, `trimmer`) and deduplication on `*_ID`.
-- **Gold Marts (`AIRBNB.gold`)**: Denormalized One Big Table (`obt`), dimensional fact table (`facts`), and SCD Type 2 dimension snapshots (`dim_*`).
-- **Semantic Layer**: Central Single Source of Truth (SSOT) defined in [`semantic_models.yml`](airbnb_snowflake_dbt_pipeline/models/gold/semantic_models.yml) eliminating cross-departmental metric drift.
-- **FastAPI Semantic Gateway**: High-performance REST service exposing governed metric queries and data catalogs.
-- **Predictive ML Pipelines**: Chronological As-Of Feature Store (Zipline pattern), Dynamic Price Regressor ($R^2 = 0.9483$), and Booking Cancellation Propensity Classifier.
-- **Airbnb Analytics Studio**: Corporate-themed multi-page Streamlit application delivering executive analytics, diagnostic RCA, and interactive ML inference.
+This platform is a production-grade data intelligence ecosystem for Airbnb marketplace analytics and predictive operations. It ingests raw event data from **AWS S3** into **Snowflake**, models transformations through a **dbt Medallion Architecture**, enforces enterprise metric consistency via the **dbt Semantic Layer (MetricFlow)**, automates **MLOps lifecycle tracking and model registry** with **MLflow**, and serves insights through **FastAPI microservices** and an interactive **Streamlit Analytics Studio**.
 
 ---
 
 ## 🏗️ Architecture & Multimodal Serving Flow
 
+The platform is designed across four decoupled, governed operational planes:
+
 ```mermaid
-flowchart TD
-    subgraph DataEngineering["1. Data Ingestion & Transformation (Snowflake + dbt)"]
-        CSV["📄 S3 CSVs"] -->|"COPY INTO"| STG["AIRBNB.staging"]
-        STG -->|"Watermark"| BRZ["AIRBNB.bronze"]
-        BRZ -->|"Macros & Dedup"| SLV["AIRBNB.silver"]
-        SLV -->|"Denormalize"| OBT["AIRBNB.gold.obt"]
-        SLV -->|"SCD Type 2"| DIM["AIRBNB.gold.dim_*"]
-        OBT & DIM --> FACTS["AIRBNB.gold.facts"]
+flowchart LR
+    %% Subgraph 1: Data Engineering Plane
+    subgraph DEP["1. Data Engineering Plane (Snowflake + dbt)"]
+        direction TB
+        S3["☁️ AWS S3<br/>Raw Event CSVs"] -->|"COPY INTO"| STG["❄️ AIRBNB.staging<br/>External Staging Tables"]
+        STG -->|"Watermark Filter"| BRZ["🥉 AIRBNB.bronze<br/>Raw Incremental Append"]
+        BRZ -->|"Jinja Macros & Dedup"| SLV["🥈 AIRBNB.silver<br/>Clean Business Models"]
+        SLV -->|"Denormalize"| OBT["🥇 AIRBNB.gold.obt<br/>One Big Table Mart"]
+        SLV -->|"SCD Type 2"| DIM["🥇 AIRBNB.gold.dim_*<br/>Dimension Snapshots"]
+        OBT & DIM --> FACTS["🥇 AIRBNB.gold.facts<br/>Dimensional Fact Table"]
     end
 
-    subgraph SemanticGov["2. Governed Metrics-as-Code (dbt Semantic Layer)"]
-        OBT --> MetricFlow["dbt MetricFlow Semantic Models<br/>(Single Source of Truth)"]
+    %% Subgraph 2: Semantic & Feature Store Plane
+    subgraph GOV["2. Governance & Feature Store"]
+        direction TB
+        OBT --> MF["📐 dbt MetricFlow<br/>Certified Semantic Models<br/>(Metrics as Code)"]
+        OBT --> FS["⚡ Zipline Feature Store<br/>As-Of Sliding Windows<br/>(Zero Lookahead Bias)"]
     end
 
-    subgraph Intelligence["3. Predictive ML & Feature Store"]
-        OBT --> FS["Point-in-Time Feature Store<br/>(30-Day Sliding As-Of Joins)"]
-        FS --> PR["Dynamic Price Regressor<br/>(R² = 0.9483, MAPE = 10.3%)"]
-        FS --> CR["Cancellation Risk Classifier<br/>(Stratified Gradient Boosting)"]
+    %% Subgraph 3: MLOps & Explainability Plane
+    subgraph MLOPS["3. MLOps & Explainability Engine"]
+        direction TB
+        FS --> TRN["🤖 Scikit-Learn Pipelines<br/>• Dynamic Price Regressor<br/>• Cancellation Classifier"]
+        TRN --> GATE["🛡️ Automated CI Gate<br/>eval_gate.py SLA Check"]
+        GATE --> REG["📦 MLflow Model Registry<br/>Centralized Tracking (:5001)<br/>Tagged @champion"]
+        REG --> SHAP["🔍 SHAP TreeExplainer<br/>• Global Feature Attribution<br/>• Underpriced Cohort Drivers"]
     end
 
-    subgraph Consumption["4. Multimodal Consumption Surfaces"]
-        MetricFlow --> API["FastAPI Semantic Gateway (:8000)<br/>• /api/v1/metrics/query<br/>• /api/v1/catalog<br/>• Automated Postman Suite"]
-        MetricFlow & PR & CR --> Studio["Airbnb Analytics Studio (:8502)<br/>• 📈 Executive Overview<br/>• 🔬 Diagnostic RCA & A/B Engine<br/>• ⚡ Self-Service Metric Explorer<br/>• 🎯 Predictive ML Studio<br/>• 📚 Catalog & Lineage Hub"]
+    %% Subgraph 4: Consumption & Serving Plane
+    subgraph SERVE["4. Serving & Consumption Surfaces"]
+        direction TB
+        MF --> API["🚀 FastAPI Gateway (:8000)<br/>• Governed Metric Endpoints<br/>• Real-Time Scoring Microservice<br/>• Dockerized Inference"]
+        REG --> API
+        MF & REG & SHAP --> APP["📊 Airbnb Analytics Studio (:8502)<br/>• Executive KPIs & Diagnostic RCA<br/>• Self-Service Metric Explorer<br/>• Predictive Studio & SHAP"]
     end
+
+    DEP --> GOV
+    GOV --> MLOPS
+    MLOPS --> SERVE
+
+    classDef blue fill:#EBF8FF,stroke:#3182CE,stroke-width:1.5px,color:#2B6CB0;
+    classDef purple fill:#FAF5FF,stroke:#805AD5,stroke-width:1.5px,color:#553C9A;
+    classDef green fill:#F0FFF4,stroke:#38A169,stroke-width:1.5px,color:#22543D;
+    classDef coral fill:#FFF5F5,stroke:#E53E3E,stroke-width:1.5px,color:#742A2A;
+
+    class S3,STG,BRZ,SLV,OBT,DIM,FACTS blue;
+    class MF,FS purple;
+    class TRN,GATE,REG,SHAP green;
+    class API,APP coral;
 ```
+
+### Architectural Planes & Key Responsibilities
+
+| Plane | Core Technologies | Primary Responsibilities | Core Deliverables & SLAs |
+| :--- | :--- | :--- | :--- |
+| **1. Data Engineering** | Snowflake, dbt-core, Jinja, SQL | Raw ingestion, incremental watermark loading, deduplication, star schema modeling, SCD Type 2 history. | `AIRBNB.staging`, `bronze`, `silver`, `gold.obt`, `gold.facts`, `dim_*`. 82/82 passing dbt tests. |
+| **2. Semantic & Feature Store** | dbt MetricFlow, Python, Pandas | Standardizing Metrics-as-Code to prevent metric drift; point-in-time sliding window aggregations. | `semantic_models.yml` (SSOT), 30-day point-in-time Zipline features with zero lookahead bias. |
+| **3. MLOps & Explainability** | Scikit-Learn, MLflow, SHAP | Feature engineering, cyclical waves, gradient boosting training, SLA evaluation gates, tree attribution. | Dynamic Price Regressor ($R^2=0.9483$), Cancellation Classifier ($F_1=0.7412$), MLflow Model Registry (`@champion`), SHAP diagnostics. |
+| **4. Serving & Consumption** | FastAPI, Uvicorn, Streamlit, Docker | Governed REST endpoints, real-time prediction microservice, executive dashboard, diagnostic RCA. | Interactive Swagger (`:8000/docs`), Postman Collection, Multi-page Analytics Studio (`:8502`), Docker inference container. |
 
 ---
 
@@ -189,9 +215,14 @@ The Analytics Studio (`apps/semantic_bi_app.py`) provides a modular enterprise u
 ```text
 Airbnb Snowflake DBT Pipeline/
 ├── pyproject.toml                                # Project metadata and dependencies (Astral uv)
-├── uv.lock                                       # Deterministic lockfile
-├── .gitignore                                    # Ignored credentials, venvs, and artifacts
-├── README.md                                     # Main project documentation
+├── uv.lock                                       # Deterministic dependency lockfile
+├── Dockerfile.inference                          # Production inference microservice container
+├── .gitignore                                    # Credentials, venvs, and artifacts exclusion
+├── README.md                                     # Production documentation & architectural specs
+│
+├── .github/workflows/                            # Decoupled CI/CD automation pipelines
+│   ├── dbt_ci_cd.yml                             # Snowflake dbt build, snapshot & data quality tests
+│   └── ml_and_apps_ci_cd.yml                     # ML training, SLA gate, pytest, API smoke & Docker
 │
 ├── airbnb_snowflake_dbt_pipeline/                # Core dbt transformation project
 │   ├── dbt_project.yml                           # dbt project configuration & schema mapping
@@ -202,39 +233,65 @@ Airbnb Snowflake DBT Pipeline/
 │   │   └── trim.sql                              # Whitespace trimming macro
 │   ├── models/
 │   │   ├── sources/sources.yml                   # Raw staging source definitions
-│   │   ├── bronze/                               # Incremental bronze models
-│   │   ├── silver/                               # Standardized silver models
-│   │   └── gold/                                 # Gold marts, OBT, facts, semantic_models.yml
-│   ├── snapshots/                                # SCD Type 2 YAML snapshot definitions
+│   │   ├── bronze/                               # Incremental bronze models (watermark filtered)
+│   │   ├── silver/                               # Standardized silver models (deduped & cleansed)
+│   │   └── gold/                                 # Gold marts: OBT, facts, and semantic_models.yml
+│   ├── snapshots/                                # SCD Type 2 dimension snapshots (dim_*)
 │   └── tests/                                    # Gatekeeper and reconciliation data tests
 │
 ├── semantic_api/                                 # FastAPI Semantic Gateway
 │   ├── main.py                                   # REST API endpoints & MetricFlow query router
 │   └── airbnb_semantic_layer_postman_collection.json # Automated Postman test suite
 │
-├── ml/                                           # Predictive Intelligence & Feature Store
-│   ├── features/                                 # Feature Store transformers & definitions
+├── ml/                                           # Predictive Intelligence & MLOps Platform
+│   ├── configs/                                  # Declarative model & feature hyperparameters
+│   ├── data/                                     # Snowflake connector & dataset loaders
+│   ├── features/                                 # Feature store, cyclical transformers, registry
+│   │   ├── feature_store.py                      # Zipline point-in-time as-of sliding windows
+│   │   ├── transformers.py                       # Cyclical waves, lead-time & ratio transformers
+│   │   └── definitions.py                        # Centralized feature registry metadata
 │   ├── models/                                   # Gradient Boosting regression & classification
-│   ├── evaluation/eval_gate.py                   # Automated CI/CD model evaluation gate
-│   ├── inference/service.py                      # Real-time inference microservice
-│   ├── train_all.py                              # Master end-to-end training pipeline
-│   └── artifacts/                                # Serialized models (git-ignored)
+│   ├── evaluation/                               # Evaluation SLA gates, SHAP attribution, SME metrics
+│   │   ├── eval_gate.py                          # Automated CI/CD performance quality gate
+│   │   ├── shap_diagnostics.py                   # TreeExplainer feature attribution & cohort drivers
+│   │   └── metrics.py                            # Technical & SME financial impact metrics
+│   ├── tracking/                                 # MLflow tracking & Model Registry manager
+│   │   └── tracker.py                            # SQLite backend & @champion alias staging
+│   ├── inference/                                # Real-time & batch inference engines
+│   │   ├── service.py                            # FastAPI-integrated prediction service
+│   │   └── batch_predictor.py                    # Scalable batch scoring pipeline
+│   ├── tests/                                    # Pytest unit, regression & zero-leakage tests
+│   ├── train_all.py                              # Master training pipeline & registry promotion
+│   └── run_shap_analysis.py                      # CLI tool generating SHAP explanation plots
 │
-├── apps/                                         # Airbnb Analytics Studio (Streamlit App)
+├── apps/                                         # Airbnb Analytics Studio (Streamlit Data App)
 │   ├── semantic_bi_app.py                        # Main multi-page navigation shell
-│   ├── components/                               # Reusable UI components, header & theme
-│   ├── assets/                                   # Authentic Airbnb Bélo vector & PNG branding
+│   ├── components/                               # Reusable UI components, header & Airbnb theme
+│   ├── assets/                                   # Official Airbnb Bélo vector & branding
 │   └── views/                                    # 5 dedicated workspace modules
-│       ├── executive_overview.py
-│       ├── diagnostic_rca.py
-│       ├── metric_explorer.py
-│       ├── predictive_studio.py
-│       └── catalog_hub.py
+│       ├── executive_overview.py                 # Executive financial KPIs & YoY performance
+│       ├── diagnostic_rca.py                     # Multi-dimensional RCA & A/B hypothesis test
+│       ├── metric_explorer.py                    # Self-service slice & dice MetricFlow explorer
+│       ├── predictive_studio.py                  # Dynamic pricing, cancellation risk & SHAP
+│       └── catalog_hub.py                        # Metric ownership directory & dbt test monitor
 │
-└── docs/                                         # In-depth architectural & business reports
+└── docs/                                         # Architectural reports & enterprise roadmaps
     ├── SEMANTIC_ARCHITECTURE_AND_ML_REPORT.md    # SME architectural guide & workflows
     └── semantic_layer_and_predictive_roadmap.md  # Engineering roadmap & design patterns
 ```
+
+---
+
+## 📐 Engineering & Data Science Best Practices
+
+This repository is built following enterprise standards for data engineering, MLOps, and production software design:
+
+1. **Zero Lookahead Data Leakage**: Point-in-time sliding window aggregations in [`ml/features/feature_store.py`](ml/features/feature_store.py) strictly enforce $t_{\text{obs}} < t_{\text{event}}$ (inspired by Airbnb's Zipline), completely eliminating temporal data leakage.
+2. **Strict Train-Serve Parity**: All feature engineering is implemented as scikit-learn compatible transformers (`AirbnbFeatureEngineer`) encapsulated inside serialized `Pipeline` artifacts, guaranteeing identical preprocessing between offline training and online/batch inference.
+3. **Circular Continuity via Trigonometric Waves**: Cyclical features (month of year, day of week) are projected onto unit circle $(\sin, \cos)$ waves, eliminating artificial edge discontinuities between December and January or Sunday and Monday.
+4. **Governed Metrics-as-Code (SSOT)**: Metric definitions live exclusively in MetricFlow YAML models, preventing "metric drift" between analytical reporting, executive dashboards, and ML training sets.
+5. **Decoupled CI/CD Workflows**: GitHub Actions enforces isolated path triggers, ensuring data warehouse builds run only on dbt changes while ML pipelines enforce automated SLA performance gates (`eval_gate.py`).
+6. **Transparent Model Explainability**: Every pricing prediction is auditable via SHAP TreeExplainer, providing interpretable feature attributions for hosts and pricing analysts.
 
 ---
 
