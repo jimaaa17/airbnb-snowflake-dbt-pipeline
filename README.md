@@ -159,21 +159,21 @@ All raw transactional and listing fields are transformed through [`ml/features/t
   * `arrival_dow_sin` & `arrival_dow_cos`: 7-day weekly cyclical wave ($\sin(2\pi \cdot \text{dow}/7)$, $\cos(2\pi \cdot \text{dow}/7)$) capturing weekly check-in cadence.
   * `is_weekend_arrival`: Binary indicator (1 for Friday/Saturday arrivals) isolating leisure vacation check-ins.
 * **Lead-Time Dynamics & Behavioral Bucketing**:
-  * `lead_time_days`: Sub-day midnight normalized lead time clipped to $[0, 730]$ days to prevent same-day floor-division integer bugs.
-  * `lead_time_log`: Variance-stabilizing $\log(1 + \text{lead\_time\_days})$ transformation dampening extreme right-skew.
+  * `lead_time_days`: Sub-day midnight normalized lead time clipped to `[0, 730]` days to prevent same-day floor-division integer bugs.
+  * `lead_time_log`: Variance-stabilizing `ln(1 + lead_time_days)` transformation dampening extreme right-skew.
   * Behavioral bins: `is_last_minute` ($\le 3$ days), `is_short_notice` ($4-7$ days), `is_far_advance` ($\ge 45$ days).
   * Data audit flags: `lead_time_missing` and `lead_time_invalid` (flags retroactive bookings).
 * **Financial Proportions & Relative Fee Burdens**:
-  * `cleaning_fee_ratio` = $\text{CLEANING\_FEE} / \text{TOTAL\_AMOUNT}$ bounded $[0.0, 1.0]$.
-  * `service_fee_ratio` = $\text{SERVICE\_FEE} / \text{TOTAL\_AMOUNT}$ bounded $[0.0, 1.0]$.
+  * `cleaning_fee_ratio` = `CLEANING_FEE / TOTAL_AMOUNT` bounded `[0.0, 1.0]`.
+  * `service_fee_ratio` = `SERVICE_FEE / TOTAL_AMOUNT` bounded `[0.0, 1.0]`.
   * Defensive division guards: masks negative/zero totals, flags `total_amount_invalid`.
 * **Supply Capacity & Relative Density**:
-  * `bedroom_to_accommodates_ratio` = $\text{BEDROOMS} / \text{ACCOMMODATES}$.
-  * `cleaning_fee_per_bedroom` = $\text{CLEANING\_FEE} / \text{BEDROOMS}$.
-  * `cleaning_fee_per_accommodate` = $\text{CLEANING\_FEE} / \text{ACCOMMODATES}$.
-  * `price_per_accommodate` = $\text{PRICE\_PER\_NIGHT} / \text{ACCOMMODATES}$ (strictly isolated to cancellation propensity to prevent target leakage in pricing).
+  * `bedroom_to_accommodates_ratio` = `BEDROOMS / ACCOMMODATES`.
+  * `cleaning_fee_per_bedroom` = `CLEANING_FEE / BEDROOMS`.
+  * `cleaning_fee_per_accommodate` = `CLEANING_FEE / ACCOMMODATES`.
+  * `price_per_accommodate` = `PRICE_PER_NIGHT / ACCOMMODATES` (strictly isolated to cancellation propensity to prevent target leakage in pricing).
 * **Point-in-Time Historical As-Of Features (Zipline)**:
-  * `trailing_30d_listing_bookings`, `trailing_30d_listing_cancellations`, and `trailing_30d_cancellation_rate` computed strictly prior to observation timestamp ($t < \text{curr\_time}$) with zero lookahead bias.
+  * `trailing_30d_listing_bookings`, `trailing_30d_listing_cancellations`, and `trailing_30d_cancellation_rate` computed strictly prior to observation timestamp (`t < curr_time`) with zero lookahead bias.
 
 ### 2. Predictive Models & SME Impact Evaluation
 
@@ -286,7 +286,7 @@ Airbnb Snowflake DBT Pipeline/
 
 This repository is built following enterprise standards for data engineering, MLOps, and production software design:
 
-1. **Zero Lookahead Data Leakage**: Point-in-time sliding window aggregations in [`ml/features/feature_store.py`](ml/features/feature_store.py) strictly enforce $t_{\text{obs}} < t_{\text{event}}$ (inspired by Airbnb's Zipline), completely eliminating temporal data leakage.
+1. **Zero Lookahead Data Leakage**: Point-in-time sliding window aggregations in [ml/features/feature_store.py](ml/features/feature_store.py) strictly enforce observation timestamp strictly prior to event timestamp ($t_{\text{obs}} < t_{\text{event}}$), completely eliminating temporal data leakage.
 2. **Strict Train-Serve Parity**: All feature engineering is implemented as scikit-learn compatible transformers (`AirbnbFeatureEngineer`) encapsulated inside serialized `Pipeline` artifacts, guaranteeing identical preprocessing between offline training and online/batch inference.
 3. **Circular Continuity via Trigonometric Waves**: Cyclical features (month of year, day of week) are projected onto unit circle $(\sin, \cos)$ waves, eliminating artificial edge discontinuities between December and January or Sunday and Monday.
 4. **Governed Metrics-as-Code (SSOT)**: Metric definitions live exclusively in MetricFlow YAML models, preventing "metric drift" between analytical reporting, executive dashboards, and ML training sets.
